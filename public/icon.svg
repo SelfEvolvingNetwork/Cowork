@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Outer Rounded Square Background - Flat Dark Slate -->
+  <rect width="512" height="512" rx="128" fill="#0f172a"/>
+  
+  <!-- Subtle Flat Decorative Circles (No gradients) -->
+  <circle cx="256" cy="256" r="220" fill="none" stroke="#1e293b" stroke-width="8"/>
+  <circle cx="256" cy="256" r="180" fill="none" stroke="#3b82f6" stroke-opacity="0.1" stroke-width="12"/>
+  
+  <!-- Shared Work/Community Desk -->
+  <path d="M 110 360 L 402 360" stroke="#ffffff" stroke-width="16" stroke-linecap="round"/>
+  
+  <!-- Central Glowing Idea / Automation Star (Flat Yellow) -->
+  <path d="M 256 105 Q 256 155 206 155 Q 256 155 256 205 Q 256 155 306 155 Q 256 155 256 105 Z" fill="#eab308"/>
+  <path d="M 256 120 Q 256 155 221 155 Q 256 155 256 190 Q 256 155 291 155 Q 256 155 256 120 Z" fill="#facc15"/>
+
+  <!-- Left Coworking Member (Flat Emerald Green) -->
+  <circle cx="180" cy="230" r="28" fill="#10b981"/>
+  <path d="M 130 330 C 130 270, 230 270, 230 330" fill="none" stroke="#10b981" stroke-width="16" stroke-linecap="round"/>
+  
+  <!-- Right Coworking Member (Flat Royal Blue) -->
+  <circle cx="332" cy="230" r="28" fill="#3b82f6"/>
+  <path d="M 282 330 C 282 270, 382 270, 382 330" fill="none" stroke="#3b82f6" stroke-width="16" stroke-linecap="round"/>
+  
+  <!-- Small Center Connection Dot on Table (Flat Cyan Indicator) -->
+  <circle cx="256" cy="360" r="12" fill="#06b6d4" />
+</svg>

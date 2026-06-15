@@ -1,0 +1,17 @@
+{
+  "name": "سامانه مدیریت فضای کار اشتراکی",
+  "short_name": "اتوماسیون فضا",
+  "description": "سیستم اتوماسیون حضور و غیاب، سانس‌بندی و پشتیبان‌گیری هوشمند مراجعین فضای کار اشتراکی",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#2563eb",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512 192x192 any"
+    }
+  ]
+}
