@@ -74,14 +74,50 @@ export function BackupTab({
   const [showWipeConfirm, setShowWipeConfirm] = useState<boolean>(false);
   const [wipeConfirmText, setWipeConfirmText] = useState<string>('');
 
+  // Helper to generate a clean/safe chronological Persian Jalali timestamp key
+  const getTimestampKey = () => {
+    const now = new Date();
+    try {
+      const formatter = new Intl.DateTimeFormat('fa-IR', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+      const parts = formatter.formatToParts(now);
+      const yr = parts.find(p => p.type === 'year')?.value || '';
+      const mo = parts.find(p => p.type === 'month')?.value || '';
+      const dy = parts.find(p => p.type === 'day')?.value || '';
+      const hr = parts.find(p => p.type === 'hour')?.value || '00';
+      const mn = parts.find(p => p.type === 'minute')?.value || '00';
+      const sc = parts.find(p => p.type === 'second')?.value || '00';
+      
+      const cleanNum = (str: string) => {
+        const persianDigits = '۰۱۲۳۴۵۶۷۸۹';
+        const converted = str.split('').map(char => {
+          const idx = persianDigits.indexOf(char);
+          return idx !== -1 ? idx.toString() : char;
+        }).join('');
+        return converted.replace(/\D/g, '');
+      };
+      
+      return `${cleanNum(yr)}${cleanNum(mo)}${cleanNum(dy)}-${cleanNum(hr)}${cleanNum(mn)}${cleanNum(sc)}`;
+    } catch (e) {
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    }
+  };
+
   // Active session and unique ID for dynamic non-overwriting filenames
   const [sessionKey, setSessionKey] = useState<string>(() => {
-    return localStorage.getItem('backup_session_key') || 'INIT-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+    return localStorage.getItem('backup_session_key') || getTimestampKey();
   });
 
   const regenerateSessionKey = () => {
-    const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
-    const newKey = `SESS_${randomSuffix}`;
+    const newKey = getTimestampKey();
     setSessionKey(newKey);
     localStorage.setItem('backup_session_key', newKey);
     return newKey;
