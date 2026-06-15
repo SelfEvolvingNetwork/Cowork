@@ -8,7 +8,8 @@ import {
   Save, 
   Clock,
   FolderOpen,
-  RefreshCw
+  RefreshCw,
+  Trash2
 } from 'lucide-react';
 import { Member, Shift, Term, SessionNotes, SessionAttendance, CalendarOverrides, CoworkingConfig } from '../types';
 import { saveHandleToDB, getHandleFromDB, deleteHandleFromDB } from '../utils/backupIndexedDb';
@@ -27,6 +28,7 @@ interface BackupTabProps {
   saveSessionNote: (termId: string, dateStr: string, note: string) => void;
   saveSessionAttendance: (termId: string, dateStr: string, status: 'present' | 'absent' | '') => void;
   importBackupData: (json: string) => boolean;
+  wipeAllData?: () => void;
   localHistory: LocalHistoryItem[];
   setLocalHistory: React.Dispatch<React.SetStateAction<LocalHistoryItem[]>>;
 }
@@ -40,6 +42,7 @@ export function BackupTab({
   sessionAttendance,
   calendarOverrides,
   importBackupData,
+  wipeAllData,
   localHistory,
   setLocalHistory,
 }: BackupTabProps) {
@@ -66,6 +69,10 @@ export function BackupTab({
 
   // File import ref
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Wiping confirmation states
+  const [showWipeConfirm, setShowWipeConfirm] = useState<boolean>(false);
+  const [wipeConfirmText, setWipeConfirmText] = useState<string>('');
 
   // Load and check support
   useEffect(() => {
@@ -480,51 +487,116 @@ export function BackupTab({
         />
       )}
 
-      {/* Toast Notice Banner - Compact Floating */}
-      {notification && (
-        <div id="toast-banner" className={`fixed top-4 left-4 z-50 px-4 py-3 rounded-xl border flex items-center gap-2.5 shadow-xl text-xs font-semibold leading-relaxed animate-slide-up ${
-          notification.type === 'success' ? 'bg-emerald-50/95 border-emerald-200 text-emerald-800' :
-          notification.type === 'refused' ? 'bg-amber-50/95 border-amber-200 text-amber-800' :
-          'bg-rose-50/95 border-rose-200 text-rose-800'
-        }`}>
-          {notification.type === 'success' ? (
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-          ) : (
-            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-          )}
-          <span>{notification.text}</span>
+      {/* Wipe Confirmation Modal */}
+      {showWipeConfirm && (
+        <div id="wipe-confirmation-modal" className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-fade-in" style={{ backgroundColor: 'rgba(15, 23, 42, 0.65)' }}>
+          <div className="bg-white border border-rose-200 rounded-2xl max-w-md w-full p-6 shadow-2xl text-right flex flex-col gap-4">
+            
+            {/* Header */}
+            <div className="flex items-center gap-3 pr-1 pb-3 border-b border-rose-50 shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 border border-rose-200/50">
+                <AlertTriangle className="w-5 h-5 text-rose-600 animate-pulse" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-rose-800 leading-tight">
+                  هشدار امنیتی بسیار مهم!
+                </h3>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  شما در حال پاک‌سازی و حذف کامل کل پایگاه داده سیستم هستید.
+                </p>
+              </div>
+            </div>
+
+            {/* Warning Details */}
+            <div className="bg-rose-50/60 border border-rose-100 rounded-xl p-3.5 text-[11px] leading-relaxed text-rose-805 flex flex-col gap-2">
+              <p>🔴 <b>این عملیات غیرقابل بازگشت است.</b> تمامی اطلاعات شامل موارد زیر برای همیشه از روی این مرورگر حذف خواهند شد:</p>
+              <ul className="list-disc list-inside space-y-1 text-[10.5px] text-rose-700 pr-2">
+                <li>لیست کامل اعضا و مشترکین ({members.length} نفر)</li>
+                <li>قراردادها و طرح‌های عضویت فعال ({terms.length} مورد)</li>
+                <li>تمامی شیفت‌های کاری تعریف شده ({shifts.length} شیفت)</li>
+                <li>تمام یادداشت‌های جلسات و گزارش حضور و غیاب‌ها</li>
+              </ul>
+            </div>
+
+            {/* Confirmation verification input */}
+            <div className="flex flex-col gap-2">
+              <label htmlFor="wipe-confirm-input" className="text-[10.5px] text-slate-500 font-bold">
+                جهت تایید نهایی، کلمه <span className="text-rose-650 font-extrabold">"حذف"</span> را در کادر زیر بنویسید:
+              </label>
+              <input
+                id="wipe-confirm-input"
+                type="text"
+                placeholder="حذف"
+                autoComplete="off"
+                value={wipeConfirmText}
+                onChange={(e) => setWipeConfirmText(e.target.value)}
+                className="w-full h-10 px-3 py-1 bg-slate-50 border border-slate-200 focus:border-rose-400 focus:bg-white rounded-xl text-center text-xs font-black transition-colors outline-none"
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-2.5 pt-2 border-t border-slate-100 mt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowWipeConfirm(false);
+                  setWipeConfirmText('');
+                }}
+                className="px-4.5 h-10 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl cursor-pointer transition-colors"
+              >
+                انصراف و بازگشت
+              </button>
+              
+              <button
+                type="button"
+                id="do-wipe-confirm-btn"
+                onClick={() => {
+                  if (wipeConfirmText === 'حذف') {
+                    if (wipeAllData) wipeAllData();
+                    setShowWipeConfirm(false);
+                    setWipeConfirmText('');
+                    showToast('success', 'تمامی اطلاعات به صورت کامل پاک‌سازی و ریست شدند.');
+                  }
+                }}
+                disabled={wipeConfirmText !== 'حذف'}
+                className="px-5 h-10 text-xs font-black bg-rose-600 hover:bg-rose-700 disabled:bg-slate-100 text-white disabled:text-slate-400 rounded-xl transition-all shadow-sm active:scale-95 disabled:pointer-events-none cursor-pointer"
+              >
+                تایید پاک‌سازی کامل
+              </button>
+            </div>
+
+          </div>
         </div>
       )}
 
       {/* Dynamic Slim Header Bar */}
-      <div id="backup-header-toolbar" className="flex justify-between items-center bg-white p-[10px] rounded-2xl border border-slate-200 shadow-3xs flex-wrap gap-4 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-7.5 h-7.5 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-4xs">
-            <HardDrive className="w-4 h-4" />
+      <div id="backup-header-toolbar" className="flex justify-between items-center bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-5xs gap-3 shrink-0">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-650 flex items-center justify-center border border-indigo-100/50">
+            <HardDrive className="w-3.5 h-3.5" />
           </div>
-          <div>
-            <h1 className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
-              <span>سامانه پشتیبان‌گیری داده‌ها</span>
-            </h1>
-          </div>
+          <h1 className="text-xs font-black text-slate-800 tracking-tight leading-none select-none">
+            مدیریت پشتیبان‌ها
+          </h1>
         </div>
 
-        {/* Global Controls: Autosave + Manual Icons (Download & Upload) */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center bg-slate-50 border border-slate-200/80 rounded-xl p-0.5 shadow-5xs" dir="ltr">
+        {/* Global Controls & Actions */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Main Actions Container */}
+          <div className="flex items-center bg-slate-50 border border-slate-200/80 rounded-lg p-0.5" dir="ltr">
             {/* Download/Export manual JSON */}
             <button
               type="button"
               id="export-manual-btn-icon"
               onClick={triggerManualDownload}
-              title="دانلود خروجی پشتیبان دستی (قالب JSON)"
-              className="p-1.5 hover:bg-white text-slate-500 hover:text-indigo-655 rounded-lg transition-all active:scale-95 cursor-pointer"
+              title="بارگیری فایل پشتیبان دستی (JSON)"
+              className="p-1 hover:bg-white text-slate-550 hover:text-indigo-600 rounded duration-100 cursor-pointer"
             >
-              <Download className="w-4 h-4" />
+              <Download className="w-3.5 h-3.5" />
             </button>
-            <span className="w-[1px] h-4 bg-slate-200 self-center" />
+            <span className="w-[1px] h-3 bg-slate-200 self-center mx-0.5" />
             {/* Upload/Import manual JSON */}
-            <div className="relative">
+            <div className="relative inline-flex">
               <input
                 type="file"
                 id="pwa-import-file-input-icon"
@@ -538,17 +610,27 @@ export function BackupTab({
                 id="trigger-import-btn-icon"
                 onClick={() => fileInputRef.current?.click()}
                 title="بارگذاری و بازیابی فایل نسخه پشتیبان"
-                className="p-1.5 hover:bg-white text-slate-500 hover:text-indigo-655 rounded-lg transition-all active:scale-95 cursor-pointer"
+                className="p-1 hover:bg-white text-slate-550 hover:text-indigo-600 rounded duration-100 cursor-pointer"
               >
-                <Upload className="w-4 h-4" />
+                <Upload className="w-3.5 h-3.5" />
               </button>
             </div>
+            <span className="w-[1px] h-3 bg-slate-200 self-center mx-0.5" />
+            {/* WIPE ALL DATA - Sleek Crimson Button with Warning Tooltip */}
+            <button
+              type="button"
+              id="header-wipe-data-action"
+              onClick={() => setShowWipeConfirm(true)}
+              title="پاک‌سازی کامل اطلاعات (بازنشانی کارخانه)"
+              className="p-1 hover:bg-rose-50 text-rose-500 hover:text-rose-650 rounded duration-100 cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
           </div>
 
-          {/* Autosave Switch */}
-          <div className="flex items-center gap-2 bg-slate-50/80 border border-slate-200 rounded-xl px-2.5 py-1.5 shadow-4xs" title="ذخیره خودکار تغییرات در پس‌زمینه">
-            <Clock className="w-3.5 h-3.5 text-indigo-500" />
-            <span className="text-[10px] text-slate-500 font-bold select-none cursor-default">ذخیره خودکار</span>
+          {/* Slim Autosave Toggle */}
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-150 rounded-lg px-2 h-6.5 select-none" title="ذخیره خودکار پیش‌فرض">
+            <span className="text-[9px] text-slate-500 font-extrabold">ذخیره خودکار</span>
             <label className="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
@@ -557,65 +639,70 @@ export function BackupTab({
                 onChange={(e) => handleToggleAutoSave(e.target.checked)}
                 className="sr-only peer"
               />
-              <div className="w-8 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:bg-indigo-600 transition-colors duration-200 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4 animate-none"></div>
+              <div className="w-6.5 h-3.5 bg-slate-200 rounded-full peer peer-checked:bg-indigo-600 after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:rounded-full after:h-2.5 after:w-2.5 after:transition-all peer-checked:after:translate-x-3 duration-100"></div>
             </label>
           </div>
         </div>
       </div>
 
-      {/* Directory Connection Ribbon Bar - Narrow, Space Saving */}
-      <div id="dir-connection-ribbon" className="bg-white px-3 py-2 rounded-2xl border border-slate-200 flex items-center justify-between gap-3 shrink-0 shadow-3xs flex-wrap min-h-[46px]">
+      {/* Directory Connection Ribbon Bar - Ultra Slim, High Density */}
+      <div 
+        id="dir-connection-ribbon" 
+        onClick={!dirHandle && isDirSupported ? handleSelectSystemDir : undefined}
+        className={`px-3 py-1.5 rounded-xl border transition-all duration-150 shrink-0 flex items-center justify-between gap-3 min-h-[36px] ${
+          !dirHandle ? 'border-dashed border-indigo-200 bg-indigo-50/15 hover:bg-indigo-50/25 hover:border-indigo-400 cursor-pointer' : 'bg-white border-slate-200'
+        }`}
+      >
         {dirHandle ? (
-          <div className="flex items-center gap-2 min-w-0 flex-1 justify-between flex-wrap">
+          <div className="flex items-center justify-between gap-3 w-full">
             {/* Status & Connected Folder Name */}
             <div className="flex items-center gap-2 min-w-0">
-              <span className={`w-2 h-2 rounded-full shrink-0 ${
-                dirPermissionStatus === 'granted' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500 animate-pulse'
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                dirPermissionStatus === 'granted' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-400 animate-pulse'
               }`} />
-              <div className="flex items-center gap-1.5 min-w-0 text-[11px]">
-                <span className="text-slate-400">پوشه ذخیره خودکار:</span>
-                <span className="font-mono text-slate-800 font-bold bg-slate-50 border border-slate-100/60 px-2 py-0.5 rounded-lg select-all max-w-[200px] truncate" title={dirName}>
+              <div className="flex items-center gap-1 min-w-0 text-[10px]">
+                <span className="text-slate-400 font-medium">ذخیره خودکار:</span>
+                <span className="font-mono text-slate-800 font-bold bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded max-w-[120px] truncate" title={dirName}>
                   {dirName}
                 </span>
                 {dirPermissionStatus !== 'granted' && (
-                  <span className="text-[10px] text-amber-600 bg-amber-55 px-2 py-0.5 rounded-md font-bold">تایید دسترسی لازم است</span>
+                  <span className="text-[8px] text-amber-600 bg-amber-50 border border-amber-200 px-1 rounded-sm font-extrabold leading-none animate-pulse">نیاز به مجوز</span>
                 )}
               </div>
             </div>
 
             {/* Config & Directory Operations */}
-            <div className="flex items-center gap-1.5 shrink-0">
+            <div className="flex items-center gap-1 shrink-0">
               {dirPermissionStatus !== 'granted' ? (
                 <button
                   type="button"
                   id="grant-dir-access-btn"
                   onClick={handleRequestDirPermission}
-                  className="px-3 h-7.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-[10px] font-bold flex items-center gap-1 transition-all shadow-xs cursor-pointer"
+                  className="px-2 h-5.5 bg-amber-500 hover:bg-amber-600 text-white rounded text-[9px] font-black flex items-center gap-1 transition-all cursor-pointer"
+                  title="تایید دسترسی خواندن و نوشتن فایل در کامپیوتر"
                 >
-                  <RefreshCw className="w-3 h-3 text-white animate-spin duration-[4000ms]" />
-                  <span>تایید دسترسی نوشتن</span>
+                  <RefreshCw className="w-2.5 h-2.5 text-white animate-spin duration-[4000ms]" />
+                  <span>تایید مجوز</span>
                 </button>
               ) : (
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1">
                   <button
                     type="button"
                     id="save-rolling-backup-btn"
                     onClick={() => writeCurrentStateToDir(dirHandle, true)}
-                    className="px-2.5 h-7.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-150 rounded-xl text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
-                    title="ایجاد فایل بکاپ زمان‌دار مجزا در پوشه"
+                    className="p-1 bg-slate-50 hover:bg-indigo-50 text-indigo-600 border border-slate-200 rounded shrink-0"
+                    title="ثبت پشتیبان زمان‌دار جدید در پوشه سیستم"
                   >
                     <Save className="w-3 h-3" />
-                    <span>پشتیبان زمان‌دار جدید</span>
                   </button>
                   <button
                     type="button"
                     id="quick-save-dir-btn"
                     onClick={() => writeCurrentStateToDir(dirHandle, false)}
-                    className="px-2.5 h-7.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-150 rounded-xl text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
-                    title="به‌روزرسانی فوری فایل پشتیبان اصلی در پوشه"
+                    className="p-1 bg-slate-50 hover:bg-emerald-50 text-emerald-600 border border-slate-200 rounded shrink-0"
+                    title="به‌روزرسانی فوری فایل پشتیبان"
                   >
                     <CheckCircle2 className="w-3 h-3" />
-                    <span>بروزرسانی فوری</span>
                   </button>
                 </div>
               )}
@@ -624,33 +711,49 @@ export function BackupTab({
                 type="button"
                 id="disconnect-dir-btn"
                 onClick={handleDisconnectDir}
-                className="px-2.5 h-7.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-150 rounded-xl text-[10px] font-bold flex items-center transition-all cursor-pointer"
-                title="قطع پیوند پوشه جاری"
+                className="px-1.5 h-5.5 text-[8.5px] bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-150 rounded cursor-pointer leading-none"
+                title="قطع پیوند پوشه جاری با نرم‌افزار"
               >
-                <span>قطع اتصال</span>
+                قطع رمزارز
               </button>
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-between gap-3 flex-grow flex-wrap">
-            <div className="flex items-center gap-1 text-[11px] text-slate-500">
-              <FolderOpen className="w-3.5 h-3.5 text-indigo-500" />
-              <span>پوشه محلی متصل نیست. برای همگام‌سازی دائمی و ذخیره تغییرات روی درایو سیستم، پوشه‌ای را انتخاب کنید.</span>
+          <div className="flex items-center justify-between gap-3 w-full select-none">
+            {/* Linked information */}
+            <div className="flex items-center gap-1.5 min-w-0">
+              <FolderOpen className="w-3.5 h-3.5 text-indigo-550 shrink-0" />
+              <div className="flex items-center gap-1 text-[10px] text-slate-500 min-w-0">
+                <span className="font-extrabold text-slate-700">اتصال هارد دیسک:</span>
+                <span className="truncate max-w-[280px]">برای ذخیره خودکار در درایو فیزیکی کامپیوتر کلیک کنید.</span>
+                
+                {/* Minimal Warning Icon with iframe limitations as Tooltip */}
+                <div 
+                  className="inline-flex text-amber-600 hover:text-amber-700 cursor-help"
+                  title="مرورگرها در حالت عادی (iframe) به دلایل امنیتی دسترسی به پوشه را مسدود می‌کنند. در صورت عدم اقدام، دکمه 'Open in new window' در نوار بالا را بفشارید."
+                >
+                  <AlertTriangle className="w-3 h-3 animate-pulse inline self-center mr-0.5" />
+                </div>
+              </div>
             </div>
-            
-            <div className="flex items-center gap-2">
+
+            {/* Quick Button */}
+            <div className="flex items-center gap-1.5 shrink-0">
               {!isDirSupported && (
-                <span className="text-[9.5px] text-rose-500 font-bold bg-rose-50 border border-rose-100 px-2.5 py-1 rounded-lg">انتخاب پوشه در مرورگر شما پشتیبانی نمی‌شود</span>
+                <span className="text-[8.5px] text-rose-500 font-extrabold bg-rose-50/60 border border-rose-100 px-1 py-0.5 rounded" title="مرورگر شما از API پوشه پشتیبانی نمی‌کند">غیرپشتیبانی</span>
               )}
               <button
                 type="button"
                 id="connect-backup-dir-btn"
-                onClick={handleSelectSystemDir}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSelectSystemDir();
+                }}
                 disabled={!isDirSupported}
-                className="px-3 h-7.5 bg-indigo-650 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none shadow-5xs"
+                className="px-2.5 h-6.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[9px] font-black flex items-center gap-1 transition-all cursor-pointer disabled:opacity-40"
               >
-                <FolderOpen className="w-3.5 h-3.5" />
-                <span>اتصال پوشه پشتیبان‌گیری</span>
+                <FolderOpen className="w-3 h-3" />
+                <span>اتصال پوشه</span>
               </button>
             </div>
           </div>

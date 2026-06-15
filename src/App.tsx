@@ -34,6 +34,7 @@ export default function App() {
     sessionAttendance,
     saveSessionAttendance,
     importBackupData,
+    wipeAllData,
     localHistory,
     setLocalHistory,
     dialogError,
@@ -149,6 +150,7 @@ export default function App() {
               saveSessionNote={saveSessionNote}
               saveSessionAttendance={saveSessionAttendance}
               importBackupData={importBackupData}
+              wipeAllData={wipeAllData}
               localHistory={localHistory}
               setLocalHistory={setLocalHistory}
             />

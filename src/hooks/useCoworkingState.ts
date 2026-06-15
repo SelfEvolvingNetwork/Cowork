@@ -555,6 +555,17 @@ export function useCoworkingState() {
     }
   };
 
+  // WIPE ALL OPERATIONAL DATA COLD RESET
+  const wipeAllData = () => {
+    setConfig({ totalRegularDesks: 20, totalPremiumDesks: 5 });
+    setShifts([]);
+    setMembers([]);
+    setTerms([]);
+    setSessionNotes({});
+    setSessionAttendance({});
+    setCalendarOverrides({});
+  };
+
   return {
     activeTab,
     setActiveTab,
@@ -580,6 +591,7 @@ export function useCoworkingState() {
     sessionAttendance,
     saveSessionAttendance,
     importBackupData,
+    wipeAllData,
     localHistory,
     setLocalHistory,
     dialogError,
