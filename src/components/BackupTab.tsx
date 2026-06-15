@@ -74,6 +74,19 @@ export function BackupTab({
   const [showWipeConfirm, setShowWipeConfirm] = useState<boolean>(false);
   const [wipeConfirmText, setWipeConfirmText] = useState<string>('');
 
+  // Active session and unique ID for dynamic non-overwriting filenames
+  const [sessionKey, setSessionKey] = useState<string>(() => {
+    return localStorage.getItem('backup_session_key') || 'INIT-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+  });
+
+  const regenerateSessionKey = () => {
+    const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const newKey = `SESS_${randomSuffix}`;
+    setSessionKey(newKey);
+    localStorage.setItem('backup_session_key', newKey);
+    return newKey;
+  };
+
   // Load and check support
   useEffect(() => {
     setIsDirSupported('showDirectoryPicker' in window);
@@ -119,8 +132,8 @@ export function BackupTab({
   const checkBackupConflictAndSync = async (handle: any) => {
     if (!handle) return;
     try {
-      // Non-destructively look for coworking_live_backup.json inside the connected folder
-      const fileH = await handle.getFileHandle('coworking_live_backup.json', { create: false });
+      // Non-destructively look for active live backup file inside the connected folder
+      const fileH = await handle.getFileHandle(`coworking_live_backup_${sessionKey}.json`, { create: false });
       const file = await fileH.getFile();
       const text = await file.text();
       let existingData;
@@ -264,7 +277,8 @@ export function BackupTab({
     if (confirm('داده‌های فعلی جایگزین شوند؟')) {
       const success = importBackupData(item.data);
       if (success) {
-        showToast('success', 'بازیابی با موفقیت انجام شد.');
+        const newKey = regenerateSessionKey();
+        showToast('success', `بازیابی با موفقیت انجام شد. شناسه بکاپ جدید: ${newKey}`);
       } else {
         showToast('error', 'خطا در بازیابی داده‌ها.');
       }
@@ -290,8 +304,9 @@ export function BackupTab({
       const text = event.target?.result as string;
       const success = importBackupData(text);
       if (success) {
+        const newKey = regenerateSessionKey();
         triggerHistoryBackup(text);
-        showToast('success', 'بازیابی با موفقیت انجام شد.');
+        showToast('success', `پرونده با موفقیت وارد و فعال شد. شناسه بکاپ: ${newKey}`);
         if (fileInputRef.current) fileInputRef.current.value = '';
       } else {
         showToast('error', 'فرمت فایل بارگذاری شده معتبر نیست.');
@@ -308,12 +323,12 @@ export function BackupTab({
       const json = getFullBackupJSON();
       
       // Determine file name
-      let fileName = 'coworking_live_backup.json';
+      let fileName = `coworking_live_backup_${sessionKey}.json`;
       if (isRolling) {
         const now = new Date();
         const datePart = now.toLocaleDateString('fa-IR').replace(/\//g, '-');
         const timePart = `${now.getHours()}-${now.getMinutes()}-${now.getSeconds()}`;
-        fileName = `coworking_backup_${datePart}_${timePart}.json`;
+        fileName = `coworking_backup_roll_${sessionKey}_${datePart}_${timePart}.json`;
       }
 
       const fileH = await handle.getFileHandle(fileName, { create: true });
@@ -383,7 +398,8 @@ export function BackupTab({
     if (!conflictBackup) return;
     const success = importBackupData(JSON.stringify(conflictBackup.existingData));
     if (success) {
-      showToast('success', 'داده‌های پشتیبان با موفقیت در نرم‌افزار بازیابی شدند.');
+      const newKey = regenerateSessionKey();
+      showToast('success', `داده‌های پشتیبان با موفقیت در نرم‌افزار بازیابی و فعال شدند. شناسه جدید: ${newKey}`);
     } else {
       showToast('error', 'خطا در بازیابی داده‌ها. فرمت فایل نامعتبر است.');
     }
@@ -508,7 +524,7 @@ export function BackupTab({
             </div>
 
             {/* Warning Details */}
-            <div className="bg-rose-50/60 border border-rose-100 rounded-xl p-3.5 text-[11px] leading-relaxed text-rose-805 flex flex-col gap-2">
+            <div className="bg-rose-50/60 border border-rose-100 rounded-xl p-3.5 text-[11px] leading-relaxed text-rose-850 flex flex-col gap-2">
               <p>🔴 <b>این عملیات غیرقابل بازگشت است.</b> تمامی اطلاعات شامل موارد زیر برای همیشه از روی این مرورگر حذف خواهند شد:</p>
               <ul className="list-disc list-inside space-y-1 text-[10.5px] text-rose-700 pr-2">
                 <li>لیست کامل اعضا و مشترکین ({members.length} نفر)</li>
@@ -516,6 +532,10 @@ export function BackupTab({
                 <li>تمامی شیفت‌های کاری تعریف شده ({shifts.length} شیفت)</li>
                 <li>تمام یادداشت‌های جلسات و گزارش حضور و غیاب‌ها</li>
               </ul>
+              
+              <div className="mt-1.5 p-2 bg-amber-55 border border-amber-200/60 rounded-xl text-[9.5px]/1.4 text-amber-800">
+                <b>💡 تدبیر ایمنی خودکار:</b> جهت محافظت از هارددیسک و پیشگیری از رونویسی تصادفی داده پیشین با محتوای خالی، اتصال پوشه متصل شده به صورت خودکار پیش از پاک‌سازی قطع خواهد شد.
+              </div>
             </div>
 
             {/* Confirmation verification input */}
@@ -552,6 +572,10 @@ export function BackupTab({
                 id="do-wipe-confirm-btn"
                 onClick={() => {
                   if (wipeConfirmText === 'حذف') {
+                    // Safety Precaution: disconnect local backup prior to state wipe to avoid zero-byte live backup file writing
+                    if (dirHandle) {
+                      handleDisconnectDir();
+                    }
                     if (wipeAllData) wipeAllData();
                     setShowWipeConfirm(false);
                     setWipeConfirmText('');
@@ -660,7 +684,7 @@ export function BackupTab({
               <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
                 dirPermissionStatus === 'granted' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-400 animate-pulse'
               }`} />
-              <div className="flex items-center gap-1 min-w-0 text-[10px]">
+              <div className="flex items-center gap-1.5 min-w-0 text-[10px] flex-wrap">
                 <span className="text-slate-400 font-medium">ذخیره خودکار:</span>
                 <span className="font-mono text-slate-800 font-bold bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded max-w-[120px] truncate" title={dirName}>
                   {dirName}
@@ -668,6 +692,10 @@ export function BackupTab({
                 {dirPermissionStatus !== 'granted' && (
                   <span className="text-[8px] text-amber-600 bg-amber-50 border border-amber-200 px-1 rounded-sm font-extrabold leading-none animate-pulse">نیاز به مجوز</span>
                 )}
+                <span className="text-slate-400 font-medium mr-1.5">شناسه فعال:</span>
+                <span className="font-mono text-indigo-750 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded font-extrabold" title="پس از بازیابی به شناسه جدیدی تبدیل می‌شود تا رونویسی پیش نیاید">
+                  {sessionKey}
+                </span>
               </div>
             </div>
 
@@ -758,6 +786,28 @@ export function BackupTab({
             </div>
           </div>
         )}
+      </div>
+
+      {/* Dynamic Security & Risky Backup Warnings */}
+      <div className="bg-amber-50/40 border border-amber-200/50 p-2 text-[10.5px] text-amber-900 shrink-0 leading-normal select-none rounded-xl">
+        <div className="flex items-center gap-1.5 font-black text-amber-950 mb-1">
+          <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+          <span>ریسک‌های امنیتی بکاپ‌گیری در مرورگر:</span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-[9.5px] text-slate-500 leading-relaxed font-semibold">
+          <div className="bg-white/50 border border-amber-100/50 p-1.5 rounded-lg flex items-start gap-1">
+            <span className="text-amber-700 font-extrabold shrink-0">۱.</span>
+            <span>پاک‌سازی تاریخچه سایت یا باز کردن در حالت ناشناس (Incognito) بکاپ‌های محلی ذخیره شده را کلاً حذف می‌کند.</span>
+          </div>
+          <div className="bg-white/50 border border-amber-100/50 p-1.5 rounded-lg flex items-start gap-1">
+            <span className="text-amber-700 font-extrabold shrink-0">۲.</span>
+            <span>ذخیره خودکار روی فایل‌های هارد دیسک بدون تغییر شناسه، نسخه معتبر پیشین را بدون اخطار رونویسی می‌کند.</span>
+          </div>
+          <div className="bg-white/50 border border-amber-100/50 p-1.5 rounded-lg flex items-start gap-1">
+            <span className="text-amber-700 font-extrabold shrink-0">۳.</span>
+            <span>پاک‌سازی کامل دیتابیس بدون قطع اتصال پوشه دیسک، فوراً دیتای معتبر پشتیبان را از هارد شما حذف می‌کند.</span>
+          </div>
+        </div>
       </div>
 
       {/* Scrollable Local Backup History Table - High Density */}
