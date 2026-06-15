@@ -95,7 +95,7 @@ export function BackupTab({
     getHandleFromDB().then(async (handle) => {
       if (handle) {
         setDirHandle(handle);
-        setDirName(handle.name || 'پوشه پیش‌فرض بکاپ');
+        setDirName(handle.name || 'پوشه بکاپ');
         try {
           const perm = await handle.queryPermission({ mode: 'readwrite' });
           setDirPermissionStatus(perm);
