@@ -146,7 +146,7 @@ export function ReportsTab({
       <div className="flex justify-between items-center bg-white p-[10px] rounded-2xl border border-slate-200 shadow-xs flex-wrap gap-4 shrink-0">
         <div>
           <h1 className="text-xl font-bold text-slate-800 flex items-center gap-3">
-            <span>گزارش‌ها</span>
+            <span>گزارش‌های ما</span>
           </h1>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
