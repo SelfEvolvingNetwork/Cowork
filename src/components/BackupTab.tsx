@@ -169,7 +169,7 @@ export function BackupTab({
     if (!handle) return;
     try {
       // Non-destructively look for active live backup file inside the connected folder
-      const fileH = await handle.getFileHandle(`coworking_live_backup_${sessionKey}.json`, { create: false });
+      const fileH = await handle.getFileHandle(`BK_${sessionKey}.json`, { create: false });
       const file = await fileH.getFile();
       const text = await file.text();
       let existingData;
@@ -232,7 +232,7 @@ export function BackupTab({
       const now = new Date();
       const timeStr = `${now.getHours()}-${now.getMinutes()}`;
       a.href = url;
-      a.download = `coworking-backup-1405-${timeStr}.json`;
+      a.download = `BK_1405_${timeStr}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -359,12 +359,12 @@ export function BackupTab({
       const json = getFullBackupJSON();
       
       // Determine file name
-      let fileName = `coworking_live_backup_${sessionKey}.json`;
+      let fileName = `BK_${sessionKey}.json`;
       if (isRolling) {
         const now = new Date();
         const datePart = now.toLocaleDateString('fa-IR').replace(/\//g, '-');
         const timePart = `${now.getHours()}-${now.getMinutes()}-${now.getSeconds()}`;
-        fileName = `coworking_backup_roll_${sessionKey}_${datePart}_${timePart}.json`;
+        fileName = `BK_ROLL_${sessionKey}_${datePart}_${timePart}.json`;
       }
 
       const fileH = await handle.getFileHandle(fileName, { create: true });
@@ -400,7 +400,8 @@ export function BackupTab({
       setDirName(handle.name || 'پوشه پشتیبان عمومی');
       setDirPermissionStatus('granted');
       await saveHandleToDB(handle);
-      showToast('success', 'پوشه بکاپ متصل و با موفقیت ذخیره شد.');
+      const newKey = regenerateSessionKey();
+      showToast('success', `پوشه بکاپ متصل و با موفقیت ذخیره شد. شناسه فعال: ${newKey}`);
       
       // Safety check for conflicts instead of immediate blind overwrite
       await checkBackupConflictAndSync(handle);
@@ -461,7 +462,7 @@ export function BackupTab({
       // Format simple local date and time digits to avoid slashes in file name
       const datePart = now.toLocaleDateString('fa-IR').replace(/\//g, '-');
       const timePart = `${now.getHours()}-${now.getMinutes()}-${now.getSeconds()}`;
-      const archiveFileName = `coworking_backup_archived_${datePart}_${timePart}.json`;
+      const archiveFileName = `BK_ARCHIVED_${datePart}_${timePart}.json`;
 
       // 1. Create archived backup file and write existing folder's backup contents into it
       const archiveFileH = await handle.getFileHandle(archiveFileName, { create: true });
@@ -492,7 +493,8 @@ export function BackupTab({
     setDirName('');
     setDirPermissionStatus('prompt');
     await deleteHandleFromDB();
-    showToast('success', 'اتصال پوشه قطع شد.');
+    const newKey = regenerateSessionKey();
+    showToast('success', `اتصال پوشه قطع شد. شناسه بکاپ جدید ایجاد شد: ${newKey}`);
   };
 
   const handleToggleAutoSave = (val: boolean) => {
