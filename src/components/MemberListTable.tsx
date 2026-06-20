@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Member, Term } from '../types';
 import { 
   UserPlus, 
@@ -6,7 +6,8 @@ import {
   Save, 
   Undo2, 
   Trash2,
-  FilterX
+  FilterX,
+  Sparkles
 } from 'lucide-react';
 
 interface MemberListTableProps {
@@ -48,24 +49,59 @@ export function MemberListTable({
   const [inlineName, setInlineName] = useState('');
   const [inlinePhone, setInlinePhone] = useState('');
   const [inlineError, setInlineError] = useState('');
+  const [continuousAdd, setContinuousAdd] = useState(true);
+  const [successMessage, setSuccessMessage] = useState('');
 
-  const handleInlineAddMember = (e: React.FormEvent) => {
-    e.preventDefault();
+  // Refs for keyboard controls
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const phoneInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto focus name input when Row opens
+  useEffect(() => {
+    if (showAddRow) {
+      setTimeout(() => {
+        nameInputRef.current?.focus();
+      }, 50);
+    } else {
+      setSuccessMessage('');
+      setInlineError('');
+    }
+  }, [showAddRow]);
+
+  // Global Alt+A / Alt+ش shortcut to toggle addition row
+  useEffect(() => {
+    const handleGlobalShortcut = (e: KeyboardEvent) => {
+      // ALT + a (english) or ALT + ش (persian layout 'a' mapping)
+      if (e.altKey && (e.key.toLowerCase() === 'a' || e.key === 'ش')) {
+        e.preventDefault();
+        setShowAddRow((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalShortcut);
+    return () => window.removeEventListener('keydown', handleGlobalShortcut);
+  }, []);
+
+  const handleInlineAddMember = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     setInlineError('');
+    setSuccessMessage('');
 
     const trimmedName = inlineName.trim();
     const trimmedPhone = inlinePhone.trim();
 
     if (!trimmedName) {
       setInlineError('نام الزامی است');
+      nameInputRef.current?.focus();
       return;
     }
     if (!trimmedPhone) {
       setInlineError('همراه الزامی است');
+      phoneInputRef.current?.focus();
       return;
     }
     if (!/^[0-9۰-۹+]+$/.test(trimmedPhone)) {
       setInlineError('ارقام نامعتبر');
+      phoneInputRef.current?.focus();
       return;
     }
 
@@ -74,9 +110,22 @@ export function MemberListTable({
       setInlineName('');
       setInlinePhone('');
       setInlineError('');
-      setShowAddRow(false);
-      // Automatically select the newly created member and switch view
-      selectMemberId(createdId);
+      
+      if (continuousAdd) {
+        setSuccessMessage(`با موفقیت ثبت شد: ${trimmedName}`);
+        // Reset message after 2.5 seconds
+        setTimeout(() => {
+          setSuccessMessage('');
+        }, 2500);
+        // Put focus back to name input for the next entry
+        setTimeout(() => {
+          nameInputRef.current?.focus();
+        }, 50);
+      } else {
+        setShowAddRow(false);
+        // Automatically select the newly created member and switch view
+        selectMemberId(createdId);
+      }
     } else {
       setInlineError('خطای عضوگیری');
     }
@@ -146,6 +195,9 @@ export function MemberListTable({
           <h3 className="font-extrabold text-slate-800 text-sm">مشتریان</h3>
           <span className="text-xs bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-lg font-sans font-bold" title="کل پرونده‌های ثبت‌شده">
             {members.length} عضو
+          </span>
+          <span className="text-[10px] text-slate-400 hidden sm:inline" title="کلیدهای میانبر: Alt + A برای بازکردن فرم">
+            (میانبر فرم ثبت تند: Alt+A)
           </span>
         </div>
         
@@ -231,42 +283,84 @@ export function MemberListTable({
             
             {/* INLINE ROW FOR INSTANT ADDING SUB-MEMBER INSIDE TABLE */}
             {showAddRow && (
-              <tr className="bg-blue-50/40 hover:bg-blue-50 transition-colors border-b border-blue-100">
-                <td className="py-3 px-4 text-center font-extrabold text-blue-600 text-sm">✨</td>
-                <td className="p-2">
-                  <input
-                    type="text"
-                    placeholder="نام و نام خانوادگی مشتری جدید..."
-                    value={inlineName}
-                    onChange={(e) => setInlineName(e.target.value)}
-                    className="w-full bg-white hover:bg-white focus:bg-white border border-blue-200 focus:border-blue-500 rounded-lg px-3 py-2 text-xs focus:outline-none transition-all text-right font-bold text-slate-800 placeholder-blue-300"
-                    dir="rtl"
-                  />
-                  {inlineError && (
-                    <div className="mt-1 text-[10px] font-bold text-rose-600 animate-shake">
-                      ⚠️ {inlineError}
-                    </div>
-                  )}
+              <tr className="bg-blue-50/40 hover:bg-blue-50/50 transition-colors border-b border-blue-100/60 font-sans">
+                <td className="py-3 px-4 text-center font-extrabold text-blue-600 text-sm">
+                  {successMessage ? '✅' : '✨'}
                 </td>
                 <td className="p-2">
-                   <input
-                    type="text"
-                    placeholder="شماره تلفن (مثال: 0912...)"
-                    value={inlinePhone}
-                    onChange={(e) => setInlinePhone(e.target.value)}
-                    className="w-full bg-white hover:bg-white focus:bg-white border border-blue-200 focus:border-blue-500 rounded-lg px-3 py-2 text-xs focus:outline-none transition-all text-left font-mono font-bold text-slate-800 placeholder-blue-300 animate-fade-in"
-                    dir="ltr"
-                  />
+                  <div className="flex flex-col gap-1">
+                    <input
+                      ref={nameInputRef}
+                      type="text"
+                      placeholder="نام و نام خانوادگی مشتری جدید..."
+                      value={inlineName}
+                      onChange={(e) => setInlineName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          phoneInputRef.current?.focus();
+                        } else if (e.key === 'Escape') {
+                          setShowAddRow(false);
+                        }
+                      }}
+                      className="w-full bg-white hover:bg-white focus:bg-white border border-blue-200 focus:border-blue-500 rounded-lg px-3 py-2 text-xs focus:outline-none transition-all text-right font-bold text-slate-800 placeholder-blue-300"
+                      dir="rtl"
+                    />
+                    {inlineError && (
+                      <div className="text-[10px] font-bold text-rose-600 animate-shake">
+                        ⚠️ {inlineError}
+                      </div>
+                    )}
+                    {successMessage && (
+                      <div className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" />
+                        <span>{successMessage}</span>
+                      </div>
+                    )}
+                  </div>
+                </td>
+                <td className="p-2">
+                  <div className="flex flex-col gap-1.5">
+                    <input
+                      ref={phoneInputRef}
+                      type="text"
+                      placeholder="شماره تلفن (مثال: 0912...)"
+                      value={inlinePhone}
+                      onChange={(e) => setInlinePhone(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleInlineAddMember();
+                        } else if (e.key === 'Escape') {
+                          setShowAddRow(false);
+                        }
+                      }}
+                      className="w-full bg-white hover:bg-white focus:bg-white border border-blue-200 focus:border-blue-500 rounded-lg px-3 py-2 text-xs focus:outline-none transition-all text-left font-mono font-bold text-slate-800 placeholder-blue-300"
+                      dir="ltr"
+                    />
+                    <label className="flex items-center gap-1.5 text-[10.5px] text-slate-500 select-none cursor-pointer hover:text-slate-800 mt-1">
+                      <input
+                        type="checkbox"
+                        checked={continuousAdd}
+                        onChange={(e) => setContinuousAdd(e.target.checked)}
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                      />
+                      <span>فرم ثبت پشت‌سرهم باز بماند</span>
+                    </label>
+                  </div>
                 </td>
                 <td className="p-2 text-center">
-                  <button
-                    onClick={handleInlineAddMember}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[11px] px-4 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1 mx-auto cursor-pointer"
-                    title="ثبت مستقیم پرونده مشتری جدید"
-                  >
-                    <UserPlus className="w-3.5 h-3.5" />
-                    <span>ثبت</span>
-                  </button>
+                  <div className="flex flex-col items-center justify-center gap-1">
+                    <button
+                      onClick={() => handleInlineAddMember()}
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[11px] px-4 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1 mx-auto cursor-pointer"
+                      title="ثبت مستقیم پرونده مشتری جدید (دکمه Enter)"
+                    >
+                      <UserPlus className="w-3.5 h-3.5" />
+                      <span>ثبت (Enter)</span>
+                    </button>
+                    <span className="text-[9px] text-slate-400">(یا کلید Esc لغو)</span>
+                  </div>
                 </td>
               </tr>
             )}

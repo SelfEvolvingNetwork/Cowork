@@ -129,8 +129,9 @@ export function ShiftsTable({ shifts, addShift, updateShift, deleteShift }: Shif
           <table className="w-full text-right border-collapse text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-slate-500 text-xs font-bold bg-slate-50/50">
-                <th className="py-4 px-4 font-semibold w-[24%] text-right text-slate-600" title="نام و عنوان اختصاصی سانس کاری">نام</th>
-                <th className="py-4 px-4 font-semibold w-[40%] text-right text-slate-600" title="روزهای کاری تعیین شده در طول هفته">روزها</th>
+                <th className="py-4 px-3 font-semibold w-[6%] text-center text-slate-600">ردیف</th>
+                <th className="py-4 px-4 font-semibold w-[20%] text-right text-slate-600" title="نام و عنوان اختصاصی سانس کاری">نام</th>
+                <th className="py-4 px-4 font-semibold w-[38%] text-right text-slate-600" title="روزهای کاری تعیین شده در طول هفته">روزها</th>
                 <th className="py-4 px-4 text-center font-semibold w-[13%] text-slate-600" title="گنجایش صندلی‌های میزهای عادی عمومی">
                   <div className="flex items-center justify-center gap-1">
                     <Armchair className="w-3.5 h-3.5 text-emerald-600" />
@@ -151,6 +152,7 @@ export function ShiftsTable({ shifts, addShift, updateShift, deleteShift }: Shif
               {/* Add New Shift Row Inline Form */}
               {isAdding && (
                 <tr className="bg-blue-50/30 animate-fade-in border-b border-blue-100/30">
+                  <td className="py-3 px-3 text-center text-blue-600 font-extrabold text-sm">✨</td>
                   <td className="py-3 px-4">
                     <input
                       id="input-new-shift-name"
@@ -231,11 +233,16 @@ export function ShiftsTable({ shifts, addShift, updateShift, deleteShift }: Shif
               )}
 
               {/* Listed Shifts Rows */}
-              {shifts.map((s) => {
+              {shifts.map((s, idx) => {
                 const isEditing = editingId === s.id;
                 return (
                   <tr key={s.id} id={`shift-row-${s.id}`} className="hover:bg-slate-50/40 transition-colors">
                     
+                    {/* Row Index cell */}
+                    <td className="py-4 px-3 text-slate-405 text-center font-mono font-bold">
+                      {idx + 1}
+                    </td>
+
                     {/* Name cell */}
                     <td className="py-4 px-4 font-bold text-slate-850">
                       {isEditing ? (

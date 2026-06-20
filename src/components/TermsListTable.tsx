@@ -201,7 +201,8 @@ export function TermsListTable({
         <table className="w-full text-right border-collapse text-xs" dir="rtl">
           <thead>
             <tr className="border-b border-slate-200 text-slate-500 font-bold bg-slate-50">
-              <th className="p-3 font-semibold text-right w-[22%]" title="سانس کاری انتخاب شده">سانس</th>
+              <th className="p-3 font-semibold text-center w-[6%]" title="ردیف">ردیف</th>
+              <th className="p-3 font-semibold text-right w-[16%]" title="سانس کاری انتخاب شده">سانس</th>
               <th className="p-3 font-semibold text-center w-[10%]" title="نوع صندلی اختصاص یافته">صندلی</th>
               <th className="p-3 font-semibold text-right w-[14%]" title="تاریخ شروع قرارداد">شروع</th>
               <th className="p-3 font-semibold text-right w-[14%]" title="تاریخ پایان قرارداد">پایان</th>
@@ -213,6 +214,7 @@ export function TermsListTable({
           <tbody className="divide-y divide-slate-100">
             {isAddingTerm && (
               <tr className="bg-blue-50/20 border-b-2 border-blue-100 animate-slide-up">
+                <td className="p-3 text-center font-bold text-blue-600 text-sm">✨</td>
                 {/* Shift Select */}
                 <td className="p-3">
                   <select
@@ -298,18 +300,20 @@ export function TermsListTable({
 
             {memberTerms.length === 0 && !isAddingTerm ? (
               <tr>
-                <td colSpan={7} className="text-center text-slate-400 italic py-8">
+                <td colSpan={8} className="text-center text-slate-400 italic py-8">
                   این مراجع هنوز در هیچ ترم یا سانسی قرار نگرفته است. برای فعالسازی از گزینه «ثبت قرارداد جدید» استفاده فرمایید.
                 </td>
               </tr>
             ) : (
-              enrichedTerms.map((t) => {
+              enrichedTerms.map((t, idx) => {
                 const isSelected = selectedTermId === t.id;
                 const isEditingThisRow = isEditingTerm && isSelected;
 
                 if (isEditingThisRow) {
                   return (
                     <tr key={t.id} className="bg-amber-50/20 border-b-2 border-amber-100 animate-slide-up">
+                      {/* Edit Indicator */}
+                      <td className="p-3 text-center font-bold text-amber-500 text-sm">✏️</td>
                       {/* Edit Shift */}
                       <td className="p-3">
                         <select
@@ -410,6 +414,7 @@ export function TermsListTable({
                       isSelected ? 'bg-blue-50/30 font-semibold border-r-4 border-r-blue-500' : ''
                     }`}
                   >
+                    <td className="p-3 text-slate-400 text-center font-mono font-bold">{idx + 1}</td>
                     <td className="p-3 text-slate-850 font-bold text-right">{t.shiftName}</td>
                     
                     {/* Desk Type Badge Display */}

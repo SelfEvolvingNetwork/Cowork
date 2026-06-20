@@ -47,7 +47,7 @@ export function BackupHistoryTable({
           <table className="w-full text-right border-collapse text-xs select-none">
             <thead className="bg-slate-50/90 text-slate-500 sticky top-0 font-extrabold border-b border-slate-150 z-10 backdrop-blur-xs">
               <tr>
-                <th className="py-2.5 px-3 text-right">#</th>
+                <th className="py-2.5 px-3 text-center w-[8%]">ردیف</th>
                 <th className="py-2.5 px-3 text-right">زمان پشتیبانی</th>
                 <th className="py-2.5 px-3 text-right">خلاصه آمار اعضا و قراردادها</th>
                 <th className="py-2.5 px-3 text-center">عملیات</th>
@@ -59,7 +59,7 @@ export function BackupHistoryTable({
                   key={item.id}
                   className="hover:bg-slate-50/60 group transition-all duration-150"
                 >
-                  <td className="py-2.5 px-3 text-slate-400 font-bold font-mono text-[10px]">{idx + 1}</td>
+                  <td className="py-2.5 px-3 text-slate-400 font-bold font-mono text-[10px] text-center w-[8%]">{idx + 1}</td>
                   <td className="py-2.5 px-3 font-extrabold text-slate-800 font-mono text-[11px]">{item.timestamp}</td>
                   <td className="py-2.5 px-3">
                     <div className="flex items-center gap-2.5 text-[10px] text-slate-500">

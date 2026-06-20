@@ -176,51 +176,56 @@ export function ReportsTab({
           <table className="w-full text-right border-collapse text-sm">
             <thead className="sticky top-0 z-20 bg-slate-50 shadow-xs">
               <tr className="border-b border-slate-200 text-slate-500 text-xs font-bold bg-slate-50">
-                
-                {/* Column 1: Person sort */}
-                <th className="py-4 px-4 font-semibold text-slate-600 w-[23%]">
-                  <button onClick={() => toggleSort('fullName')} className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer text-right w-full" title="نام و کاربری مشتری مراجع">
-                    <span>نام</span>
-                    <ArrowUpDown className="w-3.5 h-3.5 opacity-60 text-slate-400" />
-                  </button>
-                </th>
+              
+              {/* Column 0: Row index */}
+              <th className="py-4 px-3 font-semibold text-center text-slate-600 w-[6%]" title="ردیف">ردیف</th>
 
-                {/* Column 2: Shift sort */}
-                <th className="py-4 px-4 font-semibold text-slate-600 w-[18%]">
-                  <button onClick={() => toggleSort('shiftName')} className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer text-right w-full" title="سانس کاری رزرو شده مشتری">
-                    <span>سانس</span>
-                    <ArrowUpDown className="w-3.5 h-3.5 opacity-60 text-slate-400" />
-                  </button>
-                </th>
+              {/* Column 1: Person sort */}
+              <th className="py-4 px-4 font-semibold text-slate-600 w-[17%]">
+                <button onClick={() => toggleSort('fullName')} className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer text-right w-full" title="نام و کاربری مشتری مراجع">
+                  <span>نام</span>
+                  <ArrowUpDown className="w-3.5 h-3.5 opacity-60 text-slate-400" />
+                </button>
+              </th>
 
-                {/* Column 4: Desk type sort */}
-                <th className="py-4 px-[14px] font-semibold text-slate-600 w-[11%]">
-                  <button onClick={() => toggleSort('deskType')} className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer text-right w-full" title="نوع صندلی اختصاصی (عادی یا VIP)">
-                    <span>صندلی</span>
-                    <ArrowUpDown className="w-3.5 h-3.5 opacity-60 text-slate-400" />
-                  </button>
-                </th>
+              {/* Column 2: Shift sort */}
+              <th className="py-4 px-4 font-semibold text-slate-600 w-[18%]">
+                <button onClick={() => toggleSort('shiftName')} className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer text-right w-full" title="سانس کاری رزرو شده مشتری">
+                  <span>سانس</span>
+                  <ArrowUpDown className="w-3.5 h-3.5 opacity-60 text-slate-400" />
+                </button>
+              </th>
 
-                {/* Column 5: Remaining Sessions sort */}
-                <th className="py-4 px-4 font-semibold text-center text-slate-600 w-[11%]">
-                  <button onClick={() => toggleSort('remainingSessionsCount')} className="flex items-center justify-center gap-1.5 hover:text-slate-800 cursor-pointer text-center w-full" title="تعداد جلسات باقی‌مانده و متباقی دوره">
-                    <span>باقی‌مانده</span>
-                    <ArrowUpDown className="w-3.5 h-3.5 opacity-60 text-slate-400" />
-                  </button>
-                </th>
+              {/* Column 4: Desk type sort */}
+              <th className="py-4 px-[14px] font-semibold text-slate-600 w-[11%]">
+                <button onClick={() => toggleSort('deskType')} className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer text-right w-full" title="نوع صندلی اختصاصی (عادی یا VIP)">
+                  <span>صندلی</span>
+                  <ArrowUpDown className="w-3.5 h-3.5 opacity-60 text-slate-400" />
+                </button>
+              </th>
 
-                {/* Column 6: Today's Attendance */}
-                <th className="py-4 px-4 font-semibold text-center text-slate-600 w-[22%]" title={`وضعیت حضور و غیاب امروز مورخ ${todayDate}`}>حضور امروز</th>
+              {/* Column 5: Remaining Sessions sort */}
+              <th className="py-4 px-4 font-semibold text-center text-slate-600 w-[11%]">
+                <button onClick={() => toggleSort('remainingSessionsCount')} className="flex items-center justify-center gap-1.5 hover:text-slate-800 cursor-pointer text-center w-full" title="تعداد جلسات باقی‌مانده و متباقی دوره">
+                  <span>باقی‌مانده</span>
+                  <ArrowUpDown className="w-3.5 h-3.5 opacity-60 text-slate-400" />
+                </button>
+              </th>
 
-                {/* Column 7: Status */}
-                <th className="py-4 px-4 font-semibold text-center text-slate-600 w-[15%]" title="وضعیت زمانی اشتراک دوره">وضعیت</th>
+              {/* Column 6: Today's Attendance */}
+              <th className="py-4 px-4 font-semibold text-center text-slate-600 w-[22%]" title={`وضعیت حضور و غیاب امروز مورخ ${todayDate}`}>حضور امروز</th>
 
-              </tr>
+              {/* Column 7: Status */}
+              <th className="py-4 px-4 font-semibold text-center text-slate-600 w-[15%]" title="وضعیت زمانی اشتراک دوره">وضعیت</th>
 
-              {/* Inline Table Filters Row */}
-              <tr className="bg-slate-50 border-b border-slate-200">
-                {/* 1. Name Filter */}
-                <td className="p-2 w-[23%]">
+            </tr>
+
+            {/* Inline Table Filters Row */}
+            <tr className="bg-slate-50 border-b border-slate-200">
+              {/* Row index filter empty cell */}
+              <td className="p-2 w-[6%] text-center font-bold text-slate-400 text-xs">#</td>
+              {/* 1. Name Filter */}
+              <td className="p-2 w-[17%]">
                   <div className="relative">
                     <input
                       id="search-report-name"
@@ -316,20 +321,25 @@ export function ReportsTab({
             <tbody className="divide-y divide-slate-100">
               {sortedReports.length === 0 ? (
                 <tr>
-                   <td colSpan={6} className="py-12 text-center text-slate-400 italic">
+                   <td colSpan={7} className="py-12 text-center text-slate-400 italic">
                      هیچ رکوردی منطبق با فیلترهای جستجویافته پیدا نشد.
                    </td>
                 </tr>
               ) : (
-                sortedReports.map((row) => (
+                sortedReports.map((row, idx) => (
                   <tr 
                     key={row.termId} 
                     id={`report-row-${row.termId}`}
                     className="hover:bg-slate-50/40 transition-colors text-slate-700"
                   >
                     
+                    {/* Row Index cell */}
+                    <td className="py-3.5 px-3 text-slate-405 text-center font-mono font-bold w-[6%]">
+                      {idx + 1}
+                    </td>
+
                     {/* Name */}
-                    <td className="py-3.5 px-4 font-bold text-slate-800 w-[23%]">
+                    <td className="py-3.5 px-4 font-bold text-slate-800 w-[17%]">
                       {onSelectMember ? (
                         <button
                           onClick={() => onSelectMember(row.memberId, row.termId)}

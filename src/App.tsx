@@ -44,83 +44,6 @@ export default function App() {
   const [selectedMemberId, setSelectedMemberId] = React.useState<string | null>(null);
   const [selectedTermId, setSelectedTermId] = React.useState<string | null>(null);
 
-  // Render the proper tab content based on activeTab
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case 'calendar':
-        return (
-          <CalendarTab
-            todayDate={todayDate}
-            calendarOverrides={calendarOverrides}
-            toggleDayStatus={toggleDayStatus}
-            members={members}
-            terms={terms}
-            sessionNotes={sessionNotes}
-            saveSessionNote={saveSessionNote}
-            sessionAttendance={sessionAttendance}
-            saveSessionAttendance={saveSessionAttendance}
-          />
-        );
-      case 'reports':
-        return (
-          <ReportsTab
-            terms={terms}
-            members={members}
-            shifts={shifts}
-            todayDate={todayDate}
-            sessionNotes={sessionNotes}
-            saveSessionNote={saveSessionNote}
-            sessionAttendance={sessionAttendance}
-            saveSessionAttendance={saveSessionAttendance}
-            onSelectMember={(memberId, termId) => {
-              setSelectedMemberId(memberId);
-              setSelectedTermId(termId || null);
-              setActiveTab('profile');
-            }}
-          />
-        );
-      case 'profile':
-        return (
-          <ProfileTab
-            members={members}
-            terms={terms}
-            shifts={shifts}
-            todayDate={todayDate}
-            sessionNotes={sessionNotes}
-            calendarOverrides={calendarOverrides}
-            saveSessionNote={saveSessionNote}
-            sessionAttendance={sessionAttendance}
-            saveSessionAttendance={saveSessionAttendance}
-            addMember={addMember}
-            updateMember={updateMember}
-            deleteMember={deleteMember}
-            addTerm={addTerm}
-            updateTerm={updateTerm}
-            deleteTerm={deleteTerm}
-            selectedMemberId={selectedMemberId}
-            setSelectedMemberId={setSelectedMemberId}
-            initialTermId={selectedTermId}
-            setInitialTermId={setSelectedTermId}
-          />
-        );
-      case 'shifts':
-        return (
-          <ShiftsTable
-            shifts={shifts}
-            addShift={addShift}
-            updateShift={updateShift}
-            deleteShift={deleteShift}
-          />
-        );
-      default:
-        return (
-          <div className="text-center font-bold text-slate-500 py-12">
-            بخش مورد نظر پیدا نشد
-          </div>
-        );
-    }
-  };
-
   return (
     <div id="app-root-layout" className="flex h-screen w-screen overflow-hidden bg-slate-50 text-slate-800 antialiased font-sans" dir="rtl">
       
@@ -132,9 +55,77 @@ export default function App() {
         (activeTab === 'profile' || activeTab === 'reports' || activeTab === 'calendar' || activeTab === 'backup') ? 'overflow-hidden pb-0' : 'overflow-y-auto'
       }`}>
         
-        {/* Render Selected View */}
+        {/* Render Selected View with state preservation (tabs do not unmount, so filters/states remain intact) */}
         <div className={(activeTab === 'profile' || activeTab === 'reports' || activeTab === 'calendar' || activeTab === 'backup') ? 'flex-1 min-h-0 flex flex-col' : 'flex-1'}>
-          {activeTab !== 'backup' && renderTabContent()}
+          
+          {/* Calendar Tab Component Container */}
+          <div className={activeTab === 'calendar' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>
+            <CalendarTab
+              todayDate={todayDate}
+              calendarOverrides={calendarOverrides}
+              toggleDayStatus={toggleDayStatus}
+              members={members}
+              terms={terms}
+              sessionNotes={sessionNotes}
+              saveSessionNote={saveSessionNote}
+              sessionAttendance={sessionAttendance}
+              saveSessionAttendance={saveSessionAttendance}
+            />
+          </div>
+
+          {/* Reports Tab Component Container */}
+          <div className={activeTab === 'reports' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>
+            <ReportsTab
+              terms={terms}
+              members={members}
+              shifts={shifts}
+              todayDate={todayDate}
+              sessionNotes={sessionNotes}
+              saveSessionNote={saveSessionNote}
+              sessionAttendance={sessionAttendance}
+              saveSessionAttendance={saveSessionAttendance}
+              onSelectMember={(memberId, termId) => {
+                setSelectedMemberId(memberId);
+                setSelectedTermId(termId || null);
+                setActiveTab('profile');
+              }}
+            />
+          </div>
+
+          {/* Profile/Members Tab Component Container */}
+          <div className={activeTab === 'profile' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>
+            <ProfileTab
+              members={members}
+              terms={terms}
+              shifts={shifts}
+              todayDate={todayDate}
+              sessionNotes={sessionNotes}
+              calendarOverrides={calendarOverrides}
+              saveSessionNote={saveSessionNote}
+              sessionAttendance={sessionAttendance}
+              saveSessionAttendance={saveSessionAttendance}
+              addMember={addMember}
+              updateMember={updateMember}
+              deleteMember={deleteMember}
+              addTerm={addTerm}
+              updateTerm={updateTerm}
+              deleteTerm={deleteTerm}
+              selectedMemberId={selectedMemberId}
+              setSelectedMemberId={setSelectedMemberId}
+              initialTermId={selectedTermId}
+              setInitialTermId={setSelectedTermId}
+            />
+          </div>
+
+          {/* Shifts/Configuration Tab Component Container */}
+          <div className={activeTab === 'shifts' ? 'flex-1' : 'hidden'}>
+            <ShiftsTable
+              shifts={shifts}
+              addShift={addShift}
+              updateShift={updateShift}
+              deleteShift={deleteShift}
+            />
+          </div>
 
           {/* Always render BackupTab as a background worker, visual state controlled by activeTab */}
           <div className={activeTab === 'backup' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>
