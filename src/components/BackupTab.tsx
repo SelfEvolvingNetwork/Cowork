@@ -230,9 +230,54 @@ export function BackupTab({
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       const now = new Date();
-      const timeStr = `${now.getHours()}-${now.getMinutes()}`;
+      
+      let datePart = '05-04-01';
+      let timePart = '12-00';
+      
+      try {
+        const formatter = new Intl.DateTimeFormat('fa-IR', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        });
+        const parts = formatter.formatToParts(now);
+        const yr = parts.find(p => p.type === 'year')?.value || '';
+        const mo = parts.find(p => p.type === 'month')?.value || '';
+        const dy = parts.find(p => p.type === 'day')?.value || '';
+        const hr = parts.find(p => p.type === 'hour')?.value || '00';
+        const mn = parts.find(p => p.type === 'minute')?.value || '00';
+        
+        const cleanNum = (str: string) => {
+          const persianDigits = '۰۱۲۳۴۵۶۷۸۹';
+          const converted = str.split('').map(char => {
+            const idx = persianDigits.indexOf(char);
+            return idx !== -1 ? idx.toString() : char;
+          }).join('');
+          return converted.replace(/\D/g, '');
+        };
+        
+        const cYr = cleanNum(yr);
+        const cMo = cleanNum(mo).padStart(2, '0');
+        const cDy = cleanNum(dy).padStart(2, '0');
+        const cHr = cleanNum(hr).padStart(2, '0');
+        const cMn = cleanNum(mn).padStart(2, '0');
+        
+        const yearShort = cYr.slice(-2);
+        datePart = `${yearShort}-${cMo}-${cDy}`;
+        timePart = `${cHr}-${cMn}`;
+      } catch (e) {
+        // Fallback to Gregorian if fa-IR is unsupported or errors
+        const pad = (n: number) => n.toString().padStart(2, '0');
+        const rYr = now.getFullYear().toString().slice(-2);
+        datePart = `${rYr}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+        timePart = `${pad(now.getHours())}-${pad(now.getMinutes())}`;
+      }
+
       a.href = url;
-      a.download = `BK_1405_${timeStr}.json`;
+      a.download = `B${datePart}_${timePart}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -843,27 +888,7 @@ export function BackupTab({
         )}
       </div>
 
-      {/* Dynamic Security & Risky Backup Warnings */}
-      <div className="bg-amber-50/40 border border-amber-200/50 p-2 text-[10.5px] text-amber-900 shrink-0 leading-normal select-none rounded-xl">
-        <div className="flex items-center gap-1.5 font-black text-amber-950 mb-1">
-          <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-          <span>ریسک‌های امنیتی بکاپ‌گیری در مرورگر:</span>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-[9.5px] text-slate-500 leading-relaxed font-semibold">
-          <div className="bg-white/50 border border-amber-100/50 p-1.5 rounded-lg flex items-start gap-1">
-            <span className="text-amber-700 font-extrabold shrink-0">۱.</span>
-            <span>پاک‌سازی تاریخچه سایت یا باز کردن در حالت ناشناس (Incognito) بکاپ‌های محلی ذخیره شده را کلاً حذف می‌کند.</span>
-          </div>
-          <div className="bg-white/50 border border-amber-100/50 p-1.5 rounded-lg flex items-start gap-1">
-            <span className="text-amber-700 font-extrabold shrink-0">۲.</span>
-            <span>ذخیره خودکار روی فایل‌های هارد دیسک بدون تغییر شناسه، نسخه معتبر پیشین را بدون اخطار رونویسی می‌کند.</span>
-          </div>
-          <div className="bg-white/50 border border-amber-100/50 p-1.5 rounded-lg flex items-start gap-1">
-            <span className="text-amber-700 font-extrabold shrink-0">۳.</span>
-            <span>پاک‌سازی کامل دیتابیس بدون قطع اتصال پوشه دیسک، فوراً دیتای معتبر پشتیبان را از هارد شما حذف می‌کند.</span>
-          </div>
-        </div>
-      </div>
+
 
       {/* Scrollable Local Backup History Table - High Density */}
       <BackupHistoryTable
