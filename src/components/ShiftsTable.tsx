@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Shift } from '../types';
+import React, { useState, useEffect } from 'react';
+import { Shift, Term } from '../types';
 import { getWeekdayShortName } from '../utils/jalali';
 import { Clock, Plus, Trash2, Edit2, Check, X, AlertTriangle, Armchair, ShieldCheck } from 'lucide-react';
 
@@ -8,9 +8,11 @@ interface ShiftsTableProps {
   addShift: (name: string, weekDays: number[], totalRegular: number, totalPremium: number) => void;
   updateShift: (id: string, updated: Partial<Omit<Shift, 'id'>>) => void;
   deleteShift: (id: string) => boolean;
+  terms?: Term[];
+  todayDate?: string;
 }
 
-export function ShiftsTable({ shifts, addShift, updateShift, deleteShift }: ShiftsTableProps) {
+export function ShiftsTable({ shifts, addShift, updateShift, deleteShift, terms = [], todayDate = '' }: ShiftsTableProps) {
   // Inline edit state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
@@ -27,6 +29,35 @@ export function ShiftsTable({ shifts, addShift, updateShift, deleteShift }: Shif
 
   // Validation feedback
   const [errorText, setErrorText] = useState('');
+
+  useEffect(() => {
+    const handleGlobalShortcut = (e: KeyboardEvent) => {
+      if (e.altKey && (e.key.toLowerCase() === 's' || e.key === 'س')) {
+        e.preventDefault();
+        setIsAdding((prev) => {
+          if (!prev) {
+            setNewName('');
+            setNewDays([]);
+            setNewTotalRegular(20);
+            setNewTotalPremium(5);
+            setEditingId(null);
+            setErrorText('');
+          }
+          return !prev;
+        });
+      }
+    };
+    window.addEventListener('keydown', handleGlobalShortcut);
+    return () => window.removeEventListener('keydown', handleGlobalShortcut);
+  }, []);
+
+  useEffect(() => {
+    if (isAdding) {
+      setTimeout(() => {
+        document.getElementById('input-new-shift-name')?.focus();
+      }, 50);
+    }
+  }, [isAdding]);
 
   const toggleDayInList = (list: number[], setList: React.Dispatch<React.SetStateAction<number[]>>, dayIdx: number) => {
     if (list.includes(dayIdx)) {
@@ -108,7 +139,7 @@ export function ShiftsTable({ shifts, addShift, updateShift, deleteShift }: Shif
               setErrorText('');
             }}
             className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold leading-none cursor-pointer transition-all shadow-xs"
-            title="افزودن سانس کاری جدید"
+            title="افزودن سانس کاری جدید (میانبر: Alt + S)"
           >
             <Plus className="w-4 h-4" />
             <span>افزودن</span>
@@ -235,6 +266,20 @@ export function ShiftsTable({ shifts, addShift, updateShift, deleteShift }: Shif
               {/* Listed Shifts Rows */}
               {shifts.map((s, idx) => {
                 const isEditing = editingId === s.id;
+
+                // Calculate vacant/empty capacities by checking active contracts within today's date range
+                const regBusy = (terms || []).filter(
+                  (t) => t.shiftId === s.id && t.deskType === 'regular' && todayDate >= t.startDate && todayDate <= t.endDate
+                ).length;
+                const regTotal = s.totalRegular ?? 20;
+                const regVacant = Math.max(0, regTotal - regBusy);
+
+                const premBusy = (terms || []).filter(
+                  (t) => t.shiftId === s.id && t.deskType === 'premium' && todayDate >= t.startDate && todayDate <= t.endDate
+                ).length;
+                const premTotal = s.totalPremium ?? 5;
+                const premVacant = Math.max(0, premTotal - premBusy);
+
                 return (
                   <tr key={s.id} id={`shift-row-${s.id}`} className="hover:bg-slate-50/40 transition-colors">
                     
@@ -317,13 +362,28 @@ export function ShiftsTable({ shifts, addShift, updateShift, deleteShift }: Shif
                           className="w-16 bg-white border border-slate-300 text-slate-800 p-1.5 text-xs rounded-lg text-center font-mono font-extrabold text-emerald-700 font-sans"
                         />
                       ) : (
-                        <span 
-                          className="inline-flex items-center gap-1 font-mono text-xs font-extrabold text-emerald-700 bg-emerald-50 px-2.5 py-1 border border-emerald-100 rounded-lg cursor-help transition-all hover:bg-emerald-100"
-                          title={`${s.totalRegular ?? 20} صندلی عادی`}
-                        >
-                          <Armchair className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>{s.totalRegular ?? 20}</span>
-                        </span>
+                        <div className="flex items-center justify-center">
+                          <span 
+                            className={`inline-flex items-center gap-1.5 font-mono text-xs font-extrabold px-3 py-1.5 border rounded-xl shadow-5xs cursor-help transition-all duration-150 ${
+                              regBusy > regTotal
+                                ? 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-150 animate-pulse'
+                                : regBusy === regTotal
+                                ? 'bg-rose-50 text-rose-700 border-rose-250 hover:bg-rose-100'
+                                : regBusy === 0
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100'
+                                : 'bg-blue-50 text-blue-750 border-blue-100 hover:bg-blue-100'
+                            }`}
+                            title={
+                              regBusy > regTotal
+                                ? `هشدار تکمیل ظرفیت! ظرفیت کل: ${regTotal} | رزرو فعلی: ${regBusy} (تعداد ${regBusy - regTotal} رزرو مازاد بر ظرفیت)`
+                                : `ظرفیت کل: ${regTotal} صندلی عادی | رزرو شده: ${regBusy} | ظرفیت خالی امروز: ${regVacant}`
+                            }
+                          >
+                            <span className="tabular-nums">{regBusy}</span>
+                            <Armchair className={`w-3.5 h-3.5 ${regBusy > regTotal ? 'text-amber-700' : regBusy === regTotal ? 'text-rose-600' : 'text-emerald-600'}`} />
+                            <span className="tabular-nums text-slate-500 font-medium">{regTotal}</span>
+                          </span>
+                        </div>
                       )}
                     </td>
 
@@ -339,13 +399,28 @@ export function ShiftsTable({ shifts, addShift, updateShift, deleteShift }: Shif
                           className="w-16 bg-white border border-slate-300 text-slate-800 p-1.5 text-xs rounded-lg text-center font-mono font-extrabold text-blue-700 font-sans"
                         />
                       ) : (
-                        <span 
-                          className="inline-flex items-center gap-1 font-mono text-xs font-extrabold text-blue-700 bg-blue-50 px-2.5 py-1 border border-blue-100 rounded-lg cursor-help transition-all hover:bg-blue-100"
-                          title={`${s.totalPremium ?? 5} صندلی ویژه (VIP)`}
-                        >
-                          <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
-                          <span>{s.totalPremium ?? 5}</span>
-                        </span>
+                        <div className="flex items-center justify-center">
+                          <span 
+                            className={`inline-flex items-center gap-1.5 font-mono text-xs font-extrabold px-3 py-1.5 border rounded-xl shadow-5xs cursor-help transition-all duration-150 ${
+                              premBusy > premTotal
+                                ? 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-150 animate-pulse'
+                                : premBusy === premTotal
+                                ? 'bg-rose-50 text-rose-700 border-rose-250 hover:bg-rose-100'
+                                : premBusy === 0
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100'
+                                : 'bg-blue-50 text-blue-750 border-blue-100 hover:bg-blue-100'
+                            }`}
+                            title={
+                              premBusy > premTotal
+                                ? `هشدار تکمیل ظرفیت! ظرفیت کل: ${premTotal} | رزرو فعلی: ${premBusy} (تعداد ${premBusy - premTotal} رزرو مازاد بر ظرفیت)`
+                                : `ظرفیت کل: ${premTotal} صندلی ویژه (VIP) | رزرو شده: ${premBusy} | ظرفیت خالی امروز: ${premVacant}`
+                            }
+                          >
+                            <span className="tabular-nums">{premBusy}</span>
+                            <ShieldCheck className={`w-3.5 h-3.5 ${premBusy > premTotal ? 'text-amber-700' : premBusy === premTotal ? 'text-rose-600' : 'text-blue-600'}`} />
+                            <span className="tabular-nums text-slate-500 font-medium">{premTotal}</span>
+                          </span>
+                        </div>
                       )}
                     </td>
 

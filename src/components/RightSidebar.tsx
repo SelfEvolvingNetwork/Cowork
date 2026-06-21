@@ -15,11 +15,11 @@ interface RightSidebarProps {
 
 export function RightSidebar({ activeTab, setActiveTab }: RightSidebarProps) {
   const menuItems = [
-    { id: 'reports', icon: FileSpreadsheet, title: 'گزارش‌ها' },
-    { id: 'calendar', icon: Calendar, title: 'تقویم کاری' },
-    { id: 'profile', icon: User, title: 'مشترکین' },
-    { id: 'shifts', icon: Clock, title: 'سانس‌ها' },
-    { id: 'backup', icon: HardDrive, title: 'بکاپ' },
+    { id: 'reports', icon: FileSpreadsheet, title: 'گزارش‌ها', keyHint: 'Alt + 1' },
+    { id: 'calendar', icon: Calendar, title: 'تقویم کاری', keyHint: 'Alt + 2' },
+    { id: 'profile', icon: User, title: 'مشترکین', keyHint: 'Alt + 3' },
+    { id: 'shifts', icon: Clock, title: 'سانس‌ها', keyHint: 'Alt + 4' },
+    { id: 'backup', icon: HardDrive, title: 'بکاپ', keyHint: 'Alt + 5' },
   ];
 
   return (
@@ -44,7 +44,7 @@ export function RightSidebar({ activeTab, setActiveTab }: RightSidebarProps) {
                   ? 'bg-slate-850 text-blue-400 border-slate-800 shadow-inner' 
                   : 'text-slate-400 border-transparent hover:bg-slate-800/40 hover:text-slate-200'
               }`}
-              title={item.title}
+              title={`${item.title} (${item.keyHint})`}
             >
               {/* Highlight Bar */}
               {isActive && (
@@ -54,8 +54,11 @@ export function RightSidebar({ activeTab, setActiveTab }: RightSidebarProps) {
               <IconComponent className="w-5 h-5 stroke-[1.8]" />
 
               {/* Floating Tooltip Indicator - Minimal styling */}
-              <div className="invisible group-hover:visible absolute right-14 bg-slate-950 text-slate-100 text-[10px] font-bold py-1 px-2 rounded border border-slate-800 whitespace-nowrap z-50 shadow-xl font-sans text-right scale-95 origin-left group-hover:scale-100 transition-all pointer-events-none duration-150">
-                {item.title}
+              <div className="invisible group-hover:visible absolute right-14 bg-slate-950 text-slate-100 text-[10px] font-bold py-1 px-2 rounded border border-slate-800 whitespace-nowrap z-50 shadow-xl font-sans text-right scale-95 origin-left group-hover:scale-100 transition-all pointer-events-none duration-150 flex items-center gap-1.5" dir="rtl">
+                <span>{item.title}</span>
+                <span className="text-[9px] bg-slate-900 border border-slate-800 text-blue-400 px-1 py-0.5 rounded font-mono font-normal">
+                  {item.keyHint}
+                </span>
               </div>
             </button>
           );

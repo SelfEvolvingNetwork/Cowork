@@ -50,70 +50,76 @@ export function MemberProfileCard({
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs text-right">
+    <div className="bg-white border border-slate-200/80 rounded-xl p-5 text-right transition-all">
       {isEditingMember ? (
         <div className="flex flex-col gap-4 animate-fade-in">
-          <h3 className="text-sm font-bold text-slate-800 pb-2 border-b border-slate-100 flex items-center gap-2">
-            <Edit2 className="w-4 h-4 text-blue-600" />
-            <span>ویرایش پرونده</span>
-          </h3>
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 flex-row-reverse">
+            <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5 flex-row-reverse">
+              <Edit2 className="w-3.5 h-3.5 text-slate-400" />
+              <span>ویرایش مشخصات پرونده</span>
+            </h3>
+          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-bold text-slate-400">نام کامل:</label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
+            <div className="flex flex-col gap-1 text-right">
+              <label className="text-[10px] font-bold text-slate-400">نام کامل مراجع</label>
               <input
                 id="edit-fullname-inline"
                 type="text"
                 value={editMemberName}
                 onChange={(e) => setEditMemberName(e.target.value)}
-                className="w-full bg-white border border-slate-300 text-slate-850 p-2.5 text-xs rounded-xl focus:outline-none focus:border-blue-500 font-semibold text-right"
+                className="w-full bg-slate-50/50 border border-slate-200 text-slate-800 p-2 text-xs rounded-lg focus:outline-none focus:border-slate-400 font-semibold text-right transition-all"
                 dir="rtl"
+                placeholder="مثال: علی احمدی"
               />
             </div>
 
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-bold text-slate-400">تلفن همراه:</label>
+            <div className="flex flex-col gap-1 text-right">
+              <label className="text-[10px] font-bold text-slate-400">شماره تلفن همراه</label>
               <input
                 id="edit-phone-inline"
                 type="text"
                 value={editMemberPhone}
                 onChange={(e) => setEditMemberPhone(e.target.value)}
-                className="w-full bg-white border border-slate-300 text-slate-850 p-2.5 text-xs rounded-xl focus:outline-none focus:border-blue-500 font-mono text-left"
+                className="w-full bg-slate-50/50 border border-slate-200 text-slate-800 p-2 text-xs rounded-lg focus:outline-none focus:border-slate-400 font-mono text-left transition-all"
                 dir="ltr"
+                placeholder="09123456789"
               />
             </div>
           </div>
 
           {error && (
-            <p className="text-red-500 text-[10px] font-bold mt-1 text-right">{error}</p>
+            <p className="text-rose-600 text-[10.5px] font-semibold mt-1 text-right">
+              {error}
+            </p>
           )}
 
-          <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-100 flex-row-reverse">
+          <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-100 flex-row-reverse">
             <div className="flex gap-2 flex-row-reverse">
               <button
                 id="save-edit-member-btn"
                 onClick={handleSaveEditMember}
-                className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl cursor-pointer transition-colors"
+                className="flex items-center gap-1.5 px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium rounded-lg cursor-pointer transition-all"
                 title="ذخیره کلیه ویرایش‌های پرونده"
               >
-                <Check className="w-4 h-4" />
-                <span>ذخیره</span>
+                <Check className="w-3.5 h-3.5" />
+                <span>ذخیره تغییرات</span>
               </button>
               <button
                 id="cancel-edit-member-btn"
                 onClick={() => setIsEditingMember(false)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-600 text-xs font-bold rounded-xl cursor-pointer"
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-medium rounded-lg cursor-pointer transition-all"
                 title="لغو تغییرات"
               >
-                لغو
+                انصراف
               </button>
             </div>
 
             <button
               id="delete-member-inline-btn"
               onClick={handleDeleteMember}
-              className="flex items-center gap-1 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 text-xs rounded-xl cursor-pointer transition-all"
-              title="پاکسازی کامل اطلاعات پرونده مراجع"
+              className="flex items-center gap-1 px-2.5 py-1.5 hover:bg-rose-50 text-rose-600 text-xs font-semibold rounded-lg cursor-pointer transition-all"
+              title="حذف کامل پرونده مراجع"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span>حذف پرونده</span>
@@ -121,39 +127,32 @@ export function MemberProfileCard({
           </div>
         </div>
       ) : (
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 flex-row-reverse">
-          <div className="flex items-center gap-4 flex-row-reverse">
-            <div className="w-14 h-14 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 text-2xl font-bold">
-              {member.fullName[0] || 'م'}
-            </div>
-            <div className="text-right">
-              <h2 className="text-lg font-bold text-slate-850">{member.fullName}</h2>
-              <p className="text-xs text-slate-500 font-medium mt-1.5 flex items-center gap-2 flex-row-reverse">
-                <span className="font-mono text-slate-600 font-bold">شماره تماس: {member.phone}</span>
-              </p>
-            </div>
+        <div className="flex items-center justify-between gap-4 flex-row-reverse w-full">
+          {/* Info Segment: Name and Phone in a single row */}
+          <div className="flex items-center gap-4 flex-row-reverse min-w-0 flex-1">
+            <h2 className="text-sm font-bold text-slate-800 truncate" title={member.fullName}>
+              {member.fullName}
+            </h2>
+            <span className="text-slate-300 text-xs select-none">|</span>
+            <span className="text-xs text-slate-500 font-mono select-all tracking-wider">
+              {member.phone}
+            </span>
           </div>
 
-          <div className="flex items-center gap-2.5">
-            <div className="bg-slate-50 px-4 py-2 rounded-xl text-center border border-slate-200 font-sans shrink-0" title="مجموع کل قراردادهای ثبت‌شده برای مراجع">
-              <div className="text-[10px] text-slate-505 font-bold">قراردادها</div>
-              <div className="text-lg font-bold text-blue-700 mt-0.5 font-mono">{memberTermsCount} دور</div>
-            </div>
-
-            <button
-              id="edit-member-btn"
-              onClick={() => {
-                setIsEditingMember(true);
-                setEditMemberName(member.fullName);
-                setEditMemberPhone(member.phone);
-                setError('');
-              }}
-              className="p-2 sm:p-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-300 hover:border-slate-400 rounded-xl text-slate-600 cursor-pointer transition-all"
-              title="ویرایش مشخصات پرونده"
-            >
-              <Edit2 className="w-4 h-4" />
-            </button>
-          </div>
+          {/* Quick edit button to turn on editing mode */}
+          <button
+            id="edit-member-btn"
+            onClick={() => {
+              setIsEditingMember(true);
+              setEditMemberName(member.fullName);
+              setEditMemberPhone(member.phone);
+              setError('');
+            }}
+            className="flex items-center justify-center w-8 h-8 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-slate-500 hover:text-slate-700 cursor-pointer transition-all active:scale-95 shrink-0"
+            title="ویرایش پرونده"
+          >
+            <Edit2 className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
     </div>

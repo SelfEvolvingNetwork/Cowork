@@ -44,6 +44,32 @@ export default function App() {
   const [selectedMemberId, setSelectedMemberId] = React.useState<string | null>(null);
   const [selectedTermId, setSelectedTermId] = React.useState<string | null>(null);
 
+  React.useEffect(() => {
+    const handleGlobalTabShortcuts = (e: KeyboardEvent) => {
+      if (e.altKey) {
+        const key = e.key;
+        if (key === '1' || key === '۱') {
+          e.preventDefault();
+          setActiveTab('reports');
+        } else if (key === '2' || key === '۲') {
+          e.preventDefault();
+          setActiveTab('calendar');
+        } else if (key === '3' || key === '۳') {
+          e.preventDefault();
+          setActiveTab('profile');
+        } else if (key === '4' || key === '۴') {
+          e.preventDefault();
+          setActiveTab('shifts');
+        } else if (key === '5' || key === '۵') {
+          e.preventDefault();
+          setActiveTab('backup');
+        }
+      }
+    };
+    window.addEventListener('keydown', handleGlobalTabShortcuts);
+    return () => window.removeEventListener('keydown', handleGlobalTabShortcuts);
+  }, [setActiveTab]);
+
   return (
     <div id="app-root-layout" className="flex h-screen w-screen overflow-hidden bg-slate-50 text-slate-800 antialiased font-sans" dir="rtl">
       
@@ -124,6 +150,8 @@ export default function App() {
               addShift={addShift}
               updateShift={updateShift}
               deleteShift={deleteShift}
+              terms={terms}
+              todayDate={todayDate}
             />
           </div>
 

@@ -77,6 +77,22 @@ export function CalendarTab({
     setCurrentYear((prev) => prev - 1);
   };
 
+  React.useEffect(() => {
+    const handleGlobalShortcut = (e: KeyboardEvent) => {
+      if (e.altKey) {
+        if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          handlePrevMonth();
+        } else if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          handleNextMonth();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleGlobalShortcut);
+    return () => window.removeEventListener('keydown', handleGlobalShortcut);
+  }, [currentMonth, currentYear]);
+
   // Generate calendar slots
   const daysInMonth = getDaysInJalaliMonth(currentYear, currentMonth);
   const firstDayWeekday = getWeekdayOfJalali(currentYear, currentMonth, 1);
@@ -141,7 +157,7 @@ export function CalendarTab({
               id="month-prev-btn"
               onClick={handlePrevMonth}
               className="py-[4px] px-[6px] bg-white border border-slate-200 hover:bg-slate-50 text-slate-500 rounded-lg cursor-pointer transition-colors"
-              title="ماه قبل"
+              title="ماه قبل (Alt + ArrowRight)"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -163,7 +179,7 @@ export function CalendarTab({
               id="month-next-btn"
               onClick={handleNextMonth}
               className="py-[4px] px-[6px] bg-white border border-slate-200 hover:bg-slate-50 text-slate-500 rounded-lg cursor-pointer transition-colors"
-              title="ماه بعد"
+              title="ماه بعد (Alt + ArrowLeft)"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>

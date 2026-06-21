@@ -49,7 +49,7 @@ export function MemberListTable({
   const [inlineName, setInlineName] = useState('');
   const [inlinePhone, setInlinePhone] = useState('');
   const [inlineError, setInlineError] = useState('');
-  const [continuousAdd, setContinuousAdd] = useState(true);
+  const continuousAdd = true;
   const [successMessage, setSuccessMessage] = useState('');
 
   // Refs for keyboard controls
@@ -208,7 +208,7 @@ export function MemberListTable({
               ? 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100' 
               : 'bg-blue-600 border-blue-600 text-white hover:bg-blue-700 shadow-xs'
           }`}
-          title={showAddRow ? "لغو ثبت مشتری جدید" : "افزودن پرونده مشتری جدید"}
+          title={showAddRow ? "لغو ثبت مشتری جدید (Esc)" : "افزودن پرونده مشتری جدید (میانبر: Alt + A)"}
         >
           {showAddRow ? (
             <>
@@ -338,15 +338,6 @@ export function MemberListTable({
                       className="w-full bg-white hover:bg-white focus:bg-white border border-blue-200 focus:border-blue-500 rounded-lg px-3 py-2 text-xs focus:outline-none transition-all text-left font-mono font-bold text-slate-800 placeholder-blue-300"
                       dir="ltr"
                     />
-                    <label className="flex items-center gap-1.5 text-[10.5px] text-slate-500 select-none cursor-pointer hover:text-slate-800 mt-1">
-                      <input
-                        type="checkbox"
-                        checked={continuousAdd}
-                        onChange={(e) => setContinuousAdd(e.target.checked)}
-                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
-                      />
-                      <span>فرم ثبت پشت‌سرهم باز بماند</span>
-                    </label>
                   </div>
                 </td>
                 <td className="p-2 text-center">
@@ -359,7 +350,6 @@ export function MemberListTable({
                       <UserPlus className="w-3.5 h-3.5" />
                       <span>ثبت (Enter)</span>
                     </button>
-                    <span className="text-[9px] text-slate-400">(یا کلید Esc لغو)</span>
                   </div>
                 </td>
               </tr>

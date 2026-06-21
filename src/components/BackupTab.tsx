@@ -351,6 +351,23 @@ export function BackupTab({
     reader.readAsText(file);
   };
 
+  useEffect(() => {
+    const handleGlobalShortcut = (e: KeyboardEvent) => {
+      if (e.altKey) {
+        const key = e.key.toLowerCase();
+        if (key === 'd' || key === 'ی') {
+          e.preventDefault();
+          triggerManualDownload();
+        } else if (key === 'u' || key === 'ع') {
+          e.preventDefault();
+          fileInputRef.current?.click();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleGlobalShortcut);
+    return () => window.removeEventListener('keydown', handleGlobalShortcut);
+  }, [members, terms, shifts, sessionNotes, sessionAttendance, calendarOverrides]);
+
   // Write Current State to Selected Directory
   const writeCurrentStateToDir = async (handle: any, isRolling = false) => {
     if (!handle) return;
@@ -651,7 +668,7 @@ export function BackupTab({
               type="button"
               id="export-manual-btn-icon"
               onClick={triggerManualDownload}
-              title="بارگیری فایل پشتیبان دستی (JSON)"
+              title="بارگیری فایل پشتیبان دستی (Alt + D)"
               className="p-1 hover:bg-white text-slate-550 hover:text-indigo-600 rounded duration-100 cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />
@@ -671,7 +688,7 @@ export function BackupTab({
                 type="button"
                 id="trigger-import-btn-icon"
                 onClick={() => fileInputRef.current?.click()}
-                title="بارگذاری و بازیابی فایل نسخه پشتیبان"
+                title="بارگذاری و بازیابی فایل نسخه پشتیبان (Alt + U)"
                 className="p-1 hover:bg-white text-slate-550 hover:text-indigo-600 rounded duration-100 cursor-pointer"
               >
                 <Upload className="w-3.5 h-3.5" />

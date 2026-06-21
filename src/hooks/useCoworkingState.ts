@@ -368,12 +368,11 @@ export function useCoworkingState() {
     const capacityConflict = checkCapacityConflict(null, shiftId, deskType, calc.sessions);
     if (capacityConflict.isConflict) {
       showErrorDialog(
-        'خطای تکمیل ظرفیت سانس کاری',
-        `امکان ثبت این قرارداد وجود ندارد؛ زیرا ظرفیت صندلی‌های ${
+        'هشدار تکمیل ظرفیت سانس کاری',
+        `توجه: ظرفیت صندلی‌های ${
           deskType === 'premium' ? 'بخش ویژه (VIP)' : 'عادی'
-        } در سانس "${shiftObj.name}" در تاریخ ${capacityConflict.dateStr} تکمیل است. حد مجاز این صندلی‌ها در سانس انتخابی ${capacityConflict.capacity} صندلی بوده و در حال حاضر رزرو کامل گردیده است.`
+        } در سانس "${shiftObj.name}" در تاریخ ${capacityConflict.dateStr} پر شده است (ظرفیت مجاز: ${capacityConflict.capacity} صندلی). با این حال، ثبت‌نام با موفقیت ذخیره و انجام شد.`
       );
-      return null;
     }
 
     const newId = `term-${Date.now()}`;
@@ -423,13 +422,11 @@ export function useCoworkingState() {
             const capacityConflict = checkCapacityConflict(id, merged.shiftId, merged.deskType, calc.sessions, prev);
             if (capacityConflict.isConflict) {
               showErrorDialog(
-                'خطای تکمیل ظرفیت سانس کاری',
-                `امکان ویرایش و ذخیره این قرارداد وجود ندارد؛ زیرا ظرفیت صندلی‌های ${
+                'هشدار تکمیل ظرفیت سانس کاری',
+                `توجه: ظرفیت صندلی‌های ${
                   merged.deskType === 'premium' ? 'بخش ویژه (VIP)' : 'عادی'
-                } در سانس "${shiftObj.name}" در تاریخ ${capacityConflict.dateStr} به اتمام رسیده است (حد مجاز ظرفیت: ${capacityConflict.capacity} عدد).`
+                } در سانس "${shiftObj.name}" در تاریخ ${capacityConflict.dateStr} پر شده است (حد مجاز ظرفیت: ${capacityConflict.capacity} عدد). با این حال، تغییرات با موفقیت ذخیره گردید.`
               );
-              conflictFound = true;
-              return t; // Keep original
             }
 
             return {
