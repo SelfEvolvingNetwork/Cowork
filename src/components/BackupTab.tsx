@@ -9,9 +9,11 @@ import {
   Clock,
   FolderOpen,
   RefreshCw,
-  Trash2
+  Trash2,
+  FileText
 } from 'lucide-react';
 import { Member, Shift, Term, SessionNotes, SessionAttendance, CalendarOverrides, CoworkingConfig } from '../types';
+import { getTodayJalali } from '../utils/jalali';
 import { saveHandleToDB, getHandleFromDB, deleteHandleFromDB } from '../utils/backupIndexedDb';
 import { BackupConflictDialog } from './BackupConflictDialog';
 import { BackupHistoryTable, LocalHistoryItem } from './BackupHistoryTable';
@@ -219,6 +221,212 @@ export function BackupTab({
       } else {
         console.warn('Error reading existing directory backup:', err);
       }
+    }
+  };
+
+  // Helper to trigger active and reserved terms report download
+  const handleDownloadReport = () => {
+    try {
+      const todayDate = getTodayJalali();
+      const relevantTerms = terms.map(term => {
+        const member = members.find(m => m.id === term.memberId);
+        const shift = shifts.find(s => s.id === term.shiftId);
+        
+        let status: 'active' | 'reserved' | 'finished' = 'active';
+        if (todayDate > term.endDate) {
+          status = 'finished';
+        } else if (todayDate < term.startDate) {
+          status = 'reserved';
+        }
+        
+        return {
+          ...term,
+          memberName: member ? member.fullName : 'کاربر حذف شده',
+          memberPhone: member ? member.phone : 'نامشخص',
+          shiftName: shift ? shift.name : 'سانس حذف شده',
+          status
+        };
+      }).filter(t => t.status === 'active' || t.status === 'reserved');
+
+      const activeCount = relevantTerms.filter(t => t.status === 'active').length;
+      const reservedCount = relevantTerms.filter(t => t.status === 'reserved').length;
+
+      const now = new Date();
+      const jalaliTime = now.toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' });
+      const reportDateStr = `${todayDate} - ${jalaliTime}`;
+
+      const rowsHtml = relevantTerms.length > 0 ? relevantTerms.map((t, idx) => `
+        <tr class="hover:bg-slate-50 transition border-b border-slate-100 last:border-0 text-right">
+          <td class="px-4 py-3.5 text-center font-bold text-slate-400 text-xs">${idx + 1}</td>
+          <td class="px-4 py-3.5 font-bold text-slate-800 text-sm">${t.memberName}</td>
+          <td class="px-4 py-3.5 text-slate-700 text-xs font-bold">${t.shiftName}</td>
+          <td class="px-4 py-3.5 font-mono text-indigo-750 text-xs font-black">${t.startDate}</td>
+          <td class="px-4 py-3.5 font-mono text-rose-700 text-xs font-black">${t.endDate}</td>
+          <td class="px-4 py-3.5 text-center font-semibold">
+            ${t.status === 'active' 
+              ? '<span class="bg-emerald-50 text-emerald-800 border border-emerald-200/50 px-2.5 py-0.5 rounded-full text-[10.5px] font-black">فعال</span>' 
+              : '<span class="bg-blue-50 text-blue-800 border border-blue-200/50 px-2.5 py-0.5 rounded-full text-[10.5px] font-black">رزرو شده</span>'
+            }
+          </td>
+        </tr>
+      `).join('') : `
+        <tr>
+          <td colspan="6" class="px-4 py-12 text-center text-slate-400 font-extrabold text-sm bg-slate-50/50">
+            هیچ اشتراک فعال یا رزرو شده‌ای در سیستم یافت نشد.
+          </td>
+        </tr>
+      `;
+
+      const htmlContent = `<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>گزارش مدیریت - اشتراک‌های فعال و رزرو شده</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @font-face {
+      font-family: 'Vazirmatn';
+      src: url('https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/fonts/webfonts/Vazirmatn-Regular.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Vazirmatn';
+      src: url('https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/fonts/webfonts/Vazirmatn-Bold.woff2') format('woff2');
+      font-weight: 700;
+      font-style: normal;
+      font-display: swap;
+    }
+    body {
+      font-family: 'Vazirmatn', sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 p-4 md:p-8 min-h-screen flex flex-col justify-between" style="font-family: 'Vazirmatn', sans-serif;">
+
+  <!-- REPORT CONTAINER -->
+  <div class="max-w-5xl mx-auto w-full bg-white rounded-3xl border border-slate-200 p-6 md:p-8 flex-1 flex flex-col justify-between shadow-xs">
+    
+    <div>
+      <!-- HEADER section -->
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b border-dashed border-slate-200 gap-4">
+        <div class="text-right">
+          <div class="flex items-center gap-2 text-indigo-700 font-black text-lg mb-1">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            <h1 class="font-extrabold text-lg">گزارش وضعیت اعضای فعال و رزرو شده</h1>
+          </div>
+          <p class="text-xs text-slate-500 font-semibold leading-relaxed">گزارش خلاصه وضعیت اشتراک‌های معتبر (فعال و در انتظار شروع) کاربران فضای کاری</p>
+        </div>
+        <div class="flex flex-col items-start md:items-end text-right">
+          <span class="text-xs text-slate-400 font-extrabold mb-1">تاریخ تولید گزارش:</span>
+          <span class="font-mono text-slate-800 text-xs font-black bg-slate-50 border border-slate-100 px-3 py-1 rounded-xl" dir="ltr">${reportDateStr}</span>
+        </div>
+      </div>
+
+      <!-- METRICS GRID -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 my-6">
+        <!-- Card 1 -->
+        <div class="bg-slate-50/60 border border-slate-200/65 rounded-2xl p-4 text-right flex items-center justify-between">
+          <div>
+            <p class="text-[10px] text-slate-400 font-extrabold mb-1">کل ترم‌های معتبر</p>
+            <p class="text-xl font-black text-slate-850">${relevantTerms.length} <span class="text-xs font-bold text-slate-400">مورد</span></p>
+          </div>
+          <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center shrink-0 border border-slate-200/30">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+        </div>
+        <!-- Card 2 -->
+        <div class="bg-emerald-50/40 border border-emerald-100 rounded-2xl p-4 text-right flex items-center justify-between">
+          <div>
+            <p class="text-[10px] text-emerald-800 font-extrabold mb-1">اشتراک‌های فعال</p>
+            <p class="text-xl font-black text-emerald-950">${activeCount} <span class="text-xs font-bold text-emerald-700">نفر</span></p>
+          </div>
+          <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-200/30">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          </div>
+        </div>
+        <!-- Card 3 -->
+        <div class="bg-blue-50/40 border border-blue-100 rounded-2xl p-4 text-right flex items-center justify-between">
+          <div>
+            <p class="text-[10px] text-blue-800 font-extrabold mb-1">اشتراک‌های رزرو شده</p>
+            <p class="text-xl font-black text-blue-950">${reservedCount} <span class="text-xs font-bold text-blue-700">نفر</span></p>
+          </div>
+          <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 border border-blue-200/30">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- MAIN TABLE -->
+      <div class="border border-slate-200 rounded-2xl overflow-hidden mt-4 shadow-5xs">
+        <div class="overflow-x-auto">
+          <table class="w-full text-right border-collapse">
+            <thead>
+              <tr class="bg-slate-50 border-b border-slate-200 text-slate-700 text-xs font-bold">
+                <th class="px-4 py-3 text-center w-12">#</th>
+                <th class="px-4 py-3">نام و نام خانوادگی</th>
+                <th class="px-4 py-3">سانس کاری</th>
+                <th class="px-4 py-3">تاریخ شروع</th>
+                <th class="px-4 py-3">تاریخ پایان</th>
+                <th class="px-4 py-3 text-center">وضعیت</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-xs font-semibold">
+              ${rowsHtml}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- REPORT FOOTER -->
+    <div class="mt-8 pt-4 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center text-slate-400 text-[10px] gap-2">
+      <span>تولید شده به صورت خودکار توسط سامانه مدیریت فضای کار اشتراکی</span>
+      <span class="font-mono">صفحه ۱ از ۱</span>
+    </div>
+
+  </div>
+</body>
+</html>`;
+
+      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      
+      const cleanNum = (str: string) => {
+        const persianDigits = '۰۱۲۳۴۵۶۷۸۹';
+        return str.split('').map(char => {
+          const idx = persianDigits.indexOf(char);
+          return idx !== -1 ? idx.toString() : char;
+        }).join('').replace(/\D/g, '');
+      };
+
+      const rawYr = now.toLocaleDateString('fa-IR', { year: '2-digit' });
+      const rawMo = now.toLocaleDateString('fa-IR', { month: '2-digit' });
+      const rawDy = now.toLocaleDateString('fa-IR', { day: '2-digit' });
+
+      const cYr = cleanNum(rawYr).slice(-2).padStart(2, '0');
+      const cMo = cleanNum(rawMo).padStart(2, '0');
+      const cDy = cleanNum(rawDy).padStart(2, '0');
+      const cHr = pad(now.getHours());
+      const cMn = pad(now.getMinutes());
+
+      const filename = "B_Report_" + cYr + "-" + cMo + "-" + cDy + "_" + cHr + "-" + cMn + ".html";
+
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('success', 'گزارش مدیریت با موفقیت آماده و دانلود شد.');
+    } catch (err) {
+      console.error(err);
+      showToast('error', 'خطا در تولید گزارش مدیریت.');
     }
   };
 
@@ -751,6 +959,18 @@ export function BackupTab({
               <Trash2 className="w-3.5 h-3.5" />
             </button>
           </div>
+
+          {/* Download Terms Report */}
+          <button
+            type="button"
+            id="download-terms-report-btn"
+            onClick={handleDownloadReport}
+            title="دانلود گزارش جامع اشتراک‌های فعال و رزرو شده (فرمت HTML)"
+            className="flex items-center gap-1.5 px-2.5 h-6.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-750 border border-indigo-200/60 rounded-lg text-[10px] font-black cursor-pointer duration-100 select-none leading-none shrink-0 animate-pulse hover:animate-none"
+          >
+            <FileText className="w-3.5 h-3.5 text-indigo-650" />
+            <span>گزارش مدیر (HTML)</span>
+          </button>
 
           {/* Slim Autosave Toggle */}
           <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-150 rounded-lg px-2 h-6.5 select-none" title="ذخیره خودکار پیش‌فرض">
