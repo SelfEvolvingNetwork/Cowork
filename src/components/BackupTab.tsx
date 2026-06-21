@@ -359,21 +359,75 @@ export function BackupTab({
         </div>
       </div>
 
+      <!-- FILTERS & SEARCH ROW -->
+      <div class="flex flex-col sm:flex-row gap-3 my-4 p-4 bg-slate-50 border border-slate-200/60 rounded-2xl no-print">
+        <div class="flex-1 relative">
+          <input 
+            type="text" 
+            id="searchInput" 
+            placeholder="جستجو در نام، سانس یا تاریخ..." 
+            class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 font-semibold"
+            oninput="handleFilter()"
+          />
+        </div>
+        <div class="w-full sm:w-48">
+          <select 
+            id="statusFilter" 
+            class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 font-bold"
+            onchange="handleFilter()"
+          >
+            <option value="all">همه وضعیت‌ها</option>
+            <option value="active">فقط فعال</option>
+            <option value="reserved">فقط رزرو شده</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- FILTERED COUNT SUMMARY -->
+      <div class="flex justify-between items-center mb-3 px-1">
+        <span id="filteredCount" class="text-[11px] text-slate-400 font-extrabold select-none"></span>
+      </div>
+
       <!-- MAIN TABLE -->
-      <div class="border border-slate-200 rounded-2xl overflow-hidden mt-4 shadow-5xs">
+      <div class="border border-slate-200 rounded-2xl overflow-hidden shadow-5xs">
         <div class="overflow-x-auto">
           <table class="w-full text-right border-collapse">
             <thead>
-              <tr class="bg-slate-50 border-b border-slate-200 text-slate-700 text-xs font-bold">
-                <th class="px-4 py-3 text-center w-12">#</th>
-                <th class="px-4 py-3">نام و نام خانوادگی</th>
-                <th class="px-4 py-3">سانس کاری</th>
-                <th class="px-4 py-3">تاریخ شروع</th>
-                <th class="px-4 py-3">تاریخ پایان</th>
-                <th class="px-4 py-3 text-center">وضعیت</th>
+              <tr class="bg-indigo-50/40 border-b border-slate-200 text-slate-700 text-xs font-bold select-none">
+                <th class="px-4 py-3 text-center w-12 text-[10px] text-slate-400">#</th>
+                <th class="px-4 py-3 cursor-pointer hover:bg-slate-100 transition" onclick="toggleSort('memberName')">
+                  <div class="flex items-center gap-1">
+                    <span>نام و نام خانوادگی</span>
+                    <span id="sort-icon-memberName" class="text-[10px] text-slate-400 font-bold">↕</span>
+                  </div>
+                </th>
+                <th class="px-4 py-3 cursor-pointer hover:bg-slate-100 transition" onclick="toggleSort('shiftName')">
+                  <div class="flex items-center gap-1">
+                    <span>سانس کاری</span>
+                    <span id="sort-icon-shiftName" class="text-[10px] text-slate-400 font-bold">↕</span>
+                  </div>
+                </th>
+                <th class="px-4 py-3 cursor-pointer hover:bg-slate-100 transition" onclick="toggleSort('startDate')">
+                  <div class="flex items-center gap-1">
+                    <span>تاریخ شروع</span>
+                    <span id="sort-icon-startDate" class="text-[10px] text-slate-400 font-bold">↕</span>
+                  </div>
+                </th>
+                <th class="px-4 py-3 cursor-pointer hover:bg-slate-100 transition" onclick="toggleSort('endDate')">
+                  <div class="flex items-center gap-1">
+                    <span>تاریخ پایان</span>
+                    <span id="sort-icon-endDate" class="text-[10px] text-slate-400 font-bold">↕</span>
+                  </div>
+                </th>
+                <th class="px-4 py-3 text-center cursor-pointer hover:bg-slate-100 transition" onclick="toggleSort('status')">
+                  <div class="flex items-center justify-center gap-1">
+                    <span>وضعیت</span>
+                    <span id="sort-icon-status" class="text-[10px] text-slate-400 font-bold">↕</span>
+                  </div>
+                </th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100 text-xs font-semibold">
+            <tbody id="tableBody" class="divide-y divide-slate-100 text-xs font-semibold">
               ${rowsHtml}
             </tbody>
           </table>
@@ -388,6 +442,129 @@ export function BackupTab({
     </div>
 
   </div>
+
+  <script>
+    // Data injected directly from server
+    const allTerms = ${JSON.stringify(relevantTerms)};
+    let filteredTerms = [...allTerms];
+    
+    // Sort State
+    let sortKey = '';
+    let sortDirection = 'asc'; // 'asc' | 'desc'
+
+    // Filter State
+    let searchQuery = '';
+    let statusFilter = 'all';
+
+    function renderTable() {
+      const tbody = document.getElementById('tableBody');
+      const filteredCountEl = document.getElementById('filteredCount');
+      
+      // Clear body
+      tbody.innerHTML = '';
+      
+      if (filteredTerms.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-12 text-center text-slate-400 font-extrabold text-xs bg-slate-50/50">هیچ اشتراک معتبری مطابق فیلترهای شما یافت نشد.</td></tr>';
+        if (filteredCountEl) {
+          filteredCountEl.innerText = 'هیچ موردی یافت نشد';
+        }
+        return;
+      }
+      
+      if (filteredCountEl) {
+        filteredCountEl.innerText = 'نمایش ' + filteredTerms.length + ' مورد از ' + allTerms.length + ' اشتراک معتبر';
+      }
+
+      for (let i = 0; i < filteredTerms.length; i++) {
+        const t = filteredTerms[i];
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50 transition border-b border-slate-100 last:border-0 text-right";
+        
+        const statusBadge = t.status === 'active' 
+          ? '<span class="bg-emerald-50 text-emerald-800 border border-emerald-200/50 px-2.5 py-0.5 rounded-full text-[10.5px] font-black">فعال</span>' 
+          : '<span class="bg-blue-50 text-blue-800 border border-blue-200/50 px-2.5 py-0.5 rounded-full text-[10.5px] font-black">رزرو شده</span>';
+          
+        tr.innerHTML = '<td class="px-4 py-3.5 text-center font-bold text-slate-400 text-xs">' + (i + 1) + '</td>' +
+          '<td class="px-4 py-3.5 font-bold text-slate-800 text-sm">' + t.memberName + '</td>' +
+          '<td class="px-4 py-3.5 text-slate-700 text-xs font-bold">' + t.shiftName + '</td>' +
+          '<td class="px-4 py-3.5 font-mono text-indigo-750 text-xs font-black">' + t.startDate + '</td>' +
+          '<td class="px-4 py-3.5 font-mono text-rose-700 text-xs font-black">' + t.endDate + '</td>' +
+          '<td class="px-4 py-3.5 text-center font-semibold">' + statusBadge + '</td>';
+          
+        tbody.appendChild(tr);
+      }
+    }
+
+    function handleFilter() {
+      searchQuery = document.getElementById('searchInput').value.trim();
+      statusFilter = document.getElementById('statusFilter').value;
+      
+      filteredTerms = allTerms.filter(function(t) {
+        const matchesSearch = t.memberName.indexOf(searchQuery) !== -1 || 
+                             t.shiftName.indexOf(searchQuery) !== -1 || 
+                             t.startDate.indexOf(searchQuery) !== -1 || 
+                             t.endDate.indexOf(searchQuery) !== -1;
+        const matchesStatus = statusFilter === 'all' || t.status === statusFilter;
+        return matchesSearch && matchesStatus;
+      });
+      
+      // Re-apply sorting on filtered terms if any
+      if (sortKey) {
+        applySort();
+      } else {
+        renderTable();
+      }
+    }
+
+    function toggleSort(key) {
+      if (sortKey === key) {
+        sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+      } else {
+        sortKey = key;
+        sortDirection = 'asc';
+      }
+      
+      // Update Sort Icons
+      const keys = ['memberName', 'shiftName', 'startDate', 'endDate', 'status'];
+      for (let j = 0; j < keys.length; j++) {
+        const k = keys[j];
+        const icon = document.getElementById('sort-icon-' + k);
+        if (icon) {
+          if (k === sortKey) {
+            icon.innerText = sortDirection === 'asc' ? '▲' : '▼';
+            icon.className = "text-[10px] text-indigo-600 font-bold";
+          } else {
+            icon.innerText = '↕';
+            icon.className = "text-[10px] text-slate-400";
+          }
+        }
+      }
+      
+      applySort();
+    }
+
+    function applySort() {
+      filteredTerms.sort(function(a, b) {
+        const valA = a[sortKey] || '';
+        const valB = b[sortKey] || '';
+        
+        if (typeof valA === 'string') {
+          return sortDirection === 'asc' 
+            ? valA.localeCompare(valB, 'fa')
+            : valB.localeCompare(valA, 'fa');
+        } else {
+          return sortDirection === 'asc' ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
+        }
+      });
+      
+      renderTable();
+    }
+
+    // Initialize table on load
+    window.onload = function() {
+      renderTable();
+    };
+  </script>
 </body>
 </html>`;
 
