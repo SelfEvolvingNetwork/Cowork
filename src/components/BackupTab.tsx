@@ -29,7 +29,7 @@ interface BackupTabProps {
   calendarOverrides: CalendarOverrides;
   saveSessionNote: (termId: string, dateStr: string, note: string) => void;
   saveSessionAttendance: (termId: string, dateStr: string, status: 'present' | 'absent' | '') => void;
-  importBackupData: (json: string) => any;
+  importBackupData: (json: string) => Promise<boolean>;
   wipeAllData?: () => void;
   localHistory: LocalHistoryItem[];
   setLocalHistory: React.Dispatch<React.SetStateAction<LocalHistoryItem[]>>;
@@ -150,7 +150,51 @@ export function BackupTab({
     });
   }, []);
 
-  // Format the full system current state JSON
+  // Format the full system current state JSON by fetching from server first to guarantee complete data
+  const getFullBackupJSONAsync = async (): Promise<string> => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500); // 3.5s timeout
+
+      const res = await fetch("/api/data", { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        throw new Error("Server response not ok");
+      }
+      const data = await res.json();
+      const stateObj = {
+        config: data.config,
+        shifts: data.shifts,
+        members: data.members,
+        terms: data.terms,
+        notes: data.sessionNotes,
+        attendance: data.sessionAttendance,
+        overrides: data.calendarOverrides,
+        exportedAt: new Date().toISOString(),
+        appVersion: '1.2.0',
+        serverVersion: data.version || 0
+      };
+      return JSON.stringify(stateObj, null, 2);
+    } catch (err) {
+      console.warn("Could not fetch fresh database state from server. Falling back to local state.", err);
+      // Fallback to client state
+      const stateObj = {
+        config,
+        shifts,
+        members,
+        terms,
+        notes: sessionNotes,
+        attendance: sessionAttendance,
+        overrides: calendarOverrides,
+        exportedAt: new Date().toISOString(),
+        appVersion: '1.2.0 (Local Fallback)'
+      };
+      return JSON.stringify(stateObj, null, 2);
+    }
+  };
+
+  // Deprecated synchronous backup getter (kept for absolute fallback references)
   const getFullBackupJSON = () => {
     const stateObj = {
       config,
@@ -608,9 +652,9 @@ export function BackupTab({
   };
 
   // Helper to trigger system file download (fallback & manual export)
-  const triggerManualDownload = () => {
+  const triggerManualDownload = async () => {
     try {
-      const json = getFullBackupJSON();
+      const json = await getFullBackupJSONAsync();
       const blob = new Blob([json], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -739,9 +783,9 @@ export function BackupTab({
     }, 4500);
   };
 
-  const handleRestoreFromHistory = (item: LocalHistoryItem) => {
+  const handleRestoreFromHistory = async (item: LocalHistoryItem) => {
     if (confirm('داده‌های فعلی جایگزین شوند؟')) {
-      const success = importBackupData(item.data);
+      const success = await importBackupData(item.data);
       if (success) {
         const newKey = regenerateSessionKey();
         showToast('success', `بازیابی با موفقیت انجام شد. شناسه بکاپ جدید: ${newKey}`);
@@ -766,9 +810,9 @@ export function BackupTab({
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const text = event.target?.result as string;
-      const success = importBackupData(text);
+      const success = await importBackupData(text);
       if (success) {
         const newKey = regenerateSessionKey();
         triggerHistoryBackup(text);
@@ -803,7 +847,7 @@ export function BackupTab({
     if (!handle) return;
     setIsWriting(true);
     try {
-      const json = getFullBackupJSON();
+      const json = await getFullBackupJSONAsync();
       
       // Determine file name
       let fileName = `BK_${sessionKey}.json`;
@@ -827,7 +871,7 @@ export function BackupTab({
     } catch (err: any) {
       console.warn('Failed to write backup into selected directory:', err);
       // Fallback: silent store in history
-      const json = getFullBackupJSON();
+      const json = await getFullBackupJSONAsync();
       triggerHistoryBackup(json);
       showToast('error', 'خطا در ذخیره خودکار در پوشه.');
     } finally {
@@ -878,9 +922,9 @@ export function BackupTab({
   };
 
   // Conflict Resolution: Restore backup file from connected directory into React app
-  const handleResolveRestore = () => {
+  const handleResolveRestore = async () => {
     if (!conflictBackup) return;
-    const success = importBackupData(JSON.stringify(conflictBackup.existingData));
+    const success = await importBackupData(JSON.stringify(conflictBackup.existingData));
     if (success) {
       const newKey = regenerateSessionKey();
       showToast('success', `داده‌های پشتیبان با موفقیت در نرم‌افزار بازیابی و فعال شدند. شناسه جدید: ${newKey}`);
@@ -960,12 +1004,12 @@ export function BackupTab({
 
     // Only allow background write if no conflict remains unresolved
     if (autoSaveEnabled && !conflictBackup) {
-      const timer = setTimeout(() => {
+      const timer = setTimeout(async () => {
         if (dirHandle && dirPermissionStatus === 'granted') {
-          writeCurrentStateToDir(dirHandle, false);
+          await writeCurrentStateToDir(dirHandle, false);
         } else {
           // Fallback to storing in state-controlled LocalStorage history
-          const json = getFullBackupJSON();
+          const json = await getFullBackupJSONAsync();
           triggerHistoryBackup(json);
         }
       }, 1500);

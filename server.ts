@@ -363,14 +363,19 @@ async function startServer() {
   app.post("/api/import", async (req, res) => {
     try {
       const { data } = req.body;
+      if (!data || typeof data !== "object") {
+        return res.status(400).json({ error: "اطلاعات پشتیبان معتبر نمی‌باشد" });
+      }
       const db = await readDb();
-      if (data.config) db.config = data.config;
-      if (data.shifts) db.shifts = data.shifts;
-      if (data.members) db.members = data.members;
-      if (data.terms) db.terms = data.terms;
-      if (data.notes) db.sessionNotes = data.notes;
-      if (data.attendance) db.sessionAttendance = data.attendance;
-      if (data.overrides) db.calendarOverrides = data.overrides;
+      if (data.config && typeof data.config === "object") db.config = { ...db.config, ...data.config };
+      if (data.shifts && Array.isArray(data.shifts)) db.shifts = data.shifts;
+      if (data.members && Array.isArray(data.members)) db.members = data.members;
+      if (data.terms && Array.isArray(data.terms)) db.terms = data.terms;
+      if (data.notes && typeof data.notes === "object") db.sessionNotes = data.notes;
+      if (data.attendance && typeof data.attendance === "object") db.sessionAttendance = data.attendance;
+      if (data.overrides && typeof data.overrides === "object") db.calendarOverrides = data.overrides;
+      
+      recalculateAllTerms(db);
       await writeDb(db);
       res.json(db);
     } catch (err: any) {

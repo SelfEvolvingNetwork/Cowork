@@ -32,9 +32,9 @@ export function useCoworkingState() {
   const serverVersionRef = useRef<number>(0);
 
   // Helper to sync state from server
-  const syncWithServer = (data: any) => {
+  const syncWithServer = (data: any, force = false) => {
     const version = data.version || 0;
-    if (version <= serverVersionRef.current) return;
+    if (!force && version <= serverVersionRef.current) return;
 
     serverVersionRef.current = version;
     if (data.config) setConfig(data.config);
@@ -502,8 +502,11 @@ export function useCoworkingState() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ data }),
       });
+      if (!res.ok) {
+        throw new Error("Server import failed");
+      }
       const db = await res.json();
-      syncWithServer(db);
+      syncWithServer(db, true);
       return true;
     } catch (e) {
       console.error("Failed to import backup:", e);
