@@ -4,8 +4,43 @@ import { createServer as createViteServer } from "vite";
 import fs from "fs/promises";
 import { calculateTermSessions } from "./src/utils/jalali";
 
-const DB_DIR = path.join(process.cwd(), "my");
-const DB_PATH = path.join(DB_DIR, "database.json");
+let DB_DIR = path.join(process.cwd(), "my");
+let DB_PATH = path.join(DB_DIR, "database.json");
+let dirSource = "fallback_local";
+
+async function initDbDirectory() {
+  const envPath = process.env.UPLOAD_PATH;
+  if (envPath) {
+    try {
+      await fs.mkdir(envPath, { recursive: true });
+      const testFile = path.join(envPath, ".test-write");
+      await fs.writeFile(testFile, "test", "utf-8");
+      await fs.unlink(testFile);
+      DB_DIR = envPath;
+      dirSource = "env";
+      console.log(`Successfully verified and initialized storage at UPLOAD_PATH: ${DB_DIR}`);
+    } catch (err) {
+      console.error(`Warning: UPLOAD_PATH (${envPath}) is not writable. Falling back to local folder.`, err);
+      DB_DIR = path.join(process.cwd(), "my");
+      dirSource = "fallback_local";
+    }
+  } else {
+    try {
+      await fs.mkdir("/my", { recursive: true });
+      const testFile = path.join("/my", ".test-write");
+      await fs.writeFile(testFile, "test", "utf-8");
+      await fs.unlink(testFile);
+      DB_DIR = "/my";
+      dirSource = "default";
+      console.log(`Successfully verified and initialized storage at default /my: ${DB_DIR}`);
+    } catch (err) {
+      console.warn(`Warning: Default path /my is not writable. Falling back to local project folder ./my.`);
+      DB_DIR = path.join(process.cwd(), "my");
+      dirSource = "fallback_local";
+    }
+  }
+  DB_PATH = path.join(DB_DIR, "database.json");
+}
 
 interface DbState {
   version: number;
@@ -86,6 +121,9 @@ async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
 
+  // Resolve and verify the secure storage directory
+  await initDbDirectory();
+
   // Pre-create the persistent DB directory
   try {
     await fs.mkdir(DB_DIR, { recursive: true });
@@ -99,6 +137,86 @@ async function startServer() {
   // Health check API route
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", service: "coworking-manager" });
+  });
+
+  // Secure folder status check API route
+  app.get("/api/secure-folder-status", async (req, res) => {
+    try {
+      const testFileName = `write-test-${Date.now()}.tmp`;
+      const testFilePath = path.join(DB_DIR, testFileName);
+      const testContent = "Runflare secure folder connection test string";
+      
+      let canWrite = false;
+      let canRead = false;
+      let canDelete = false;
+      let writeError = null;
+      let readError = null;
+      let deleteError = null;
+
+      // 1. Create directory if not exists
+      try {
+        await fs.mkdir(DB_DIR, { recursive: true });
+      } catch (err: any) {
+        writeError = `Failed to create/verify directory: ${err.message}`;
+      }
+
+      if (!writeError) {
+        // 2. Try writing
+        try {
+          await fs.writeFile(testFilePath, testContent, "utf-8");
+          canWrite = true;
+        } catch (err: any) {
+          writeError = err.message;
+        }
+
+        // 3. Try reading if wrote successfully
+        if (canWrite) {
+          try {
+            const content = await fs.readFile(testFilePath, "utf-8");
+            canRead = content === testContent;
+            if (!canRead) {
+              readError = "Read content did not match written content";
+            }
+          } catch (err: any) {
+            readError = err.message;
+          }
+
+          // 4. Try deleting
+          try {
+            await fs.unlink(testFilePath);
+            canDelete = true;
+          } catch (err: any) {
+            deleteError = err.message;
+          }
+        }
+      }
+
+      const overallSuccess = canWrite && canRead && canDelete;
+
+      res.json({
+        status: overallSuccess ? "ok" : "error",
+        diskPath: DB_DIR,
+        source: dirSource,
+        testResult: {
+          write: canWrite ? "success" : "failed",
+          read: canRead ? "success" : "failed",
+          delete: canDelete ? "success" : "failed",
+          errors: {
+            write: writeError,
+            read: readError,
+            delete: deleteError
+          }
+        },
+        timestamp: new Date().toISOString()
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        status: "error",
+        diskPath: DB_DIR,
+        source: dirSource,
+        error: err.message
+      });
+    }
   });
 
   // Get current DB
