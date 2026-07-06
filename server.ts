@@ -4,7 +4,8 @@ import { createServer as createViteServer } from "vite";
 import fs from "fs/promises";
 import { calculateTermSessions } from "./src/utils/jalali";
 
-const DB_PATH = path.join(process.cwd(), "database.json");
+const DB_DIR = path.join(process.cwd(), "my");
+const DB_PATH = path.join(DB_DIR, "database.json");
 
 interface DbState {
   version: number;
@@ -58,6 +59,9 @@ const dbQueue = new DbQueue();
 async function readDb(): Promise<DbState> {
   return dbQueue.run(async () => {
     try {
+      await fs.mkdir(DB_DIR, { recursive: true });
+    } catch (e) {}
+    try {
       const data = await fs.readFile(DB_PATH, "utf-8");
       return JSON.parse(data);
     } catch {
@@ -70,6 +74,9 @@ async function readDb(): Promise<DbState> {
 async function writeDb(state: DbState): Promise<DbState> {
   return dbQueue.run(async () => {
     state.version = (state.version || 0) + 1;
+    try {
+      await fs.mkdir(DB_DIR, { recursive: true });
+    } catch (e) {}
     await fs.writeFile(DB_PATH, JSON.stringify(state, null, 2), "utf-8");
     return state;
   });
