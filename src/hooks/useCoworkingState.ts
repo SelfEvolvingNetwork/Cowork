@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { CoworkingConfig, Shift, Member, Term, SessionNotes, CalendarOverrides, SessionAttendance } from '../types';
 import { calculateTermSessions, getTodayJalali, isValidJalaliDate, normalizePersianDigits } from '../utils/jalali';
 
@@ -8,78 +8,20 @@ export interface DialogError {
   message: string;
 }
 
-const STORAGE_KEYS = {
-  CONFIG: 'coworking_config',
-  SHIFTS: 'coworking_shifts',
-  MEMBERS: 'coworking_members',
-  TERMS: 'coworking_terms',
-  NOTES: 'coworking_notes',
-  ATTENDANCE: 'coworking_attendance',
-  OVERRIDES: 'coworking_overrides',
-};
-
 export function useCoworkingState() {
   const [activeTab, setActiveTab] = useState<'calendar' | 'reports' | 'profile' | 'shifts' | 'backup'>('reports');
 
   // Define dynamic today's date
   const [todayDate] = useState<string>(() => getTodayJalali());
 
-  // 1. Core State Load
-  const [config, setConfig] = useState<CoworkingConfig>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.CONFIG);
-    return saved ? JSON.parse(saved) : { totalRegularDesks: 20, totalPremiumDesks: 5 };
-  });
-
-  const [shifts, setShifts] = useState<Shift[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.SHIFTS);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      return parsed.map((s: any) => ({
-        ...s,
-        totalRegular: typeof s.totalRegular === 'number' ? s.totalRegular : 20,
-        totalPremium: typeof s.totalPremium === 'number' ? s.totalPremium : 5,
-      }));
-    }
-    return [];
-  });
-
-  const [members, setMembers] = useState<Member[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.MEMBERS);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      return parsed.map(({ deskType, ...m }: any) => m);
-    }
-    return [];
-  });
-
-  const [calendarOverrides, setCalendarOverrides] = useState<CalendarOverrides>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.OVERRIDES);
-    return saved ? JSON.parse(saved) : {};
-  });
-
-  const [terms, setTerms] = useState<Term[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.TERMS);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      return parsed.map((t: any) => ({
-        ...t,
-        deskType: t.deskType || 'regular',
-      }));
-    }
-    return [];
-  });
-
-  const [sessionNotes, setSessionNotes] = useState<SessionNotes>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.NOTES);
-    if (saved) return JSON.parse(saved);
-    return {};
-  });
-
-  const [sessionAttendance, setSessionAttendance] = useState<SessionAttendance>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.ATTENDANCE);
-    if (saved) return JSON.parse(saved);
-    return {};
-  });
+  // 1. Core State
+  const [config, setConfig] = useState<CoworkingConfig>({ totalRegularDesks: 20, totalPremiumDesks: 5 });
+  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [calendarOverrides, setCalendarOverrides] = useState<CalendarOverrides>({});
+  const [terms, setTerms] = useState<Term[]>([]);
+  const [sessionNotes, setSessionNotes] = useState<SessionNotes>({});
+  const [sessionAttendance, setSessionAttendance] = useState<SessionAttendance>({});
 
   const [dialogError, setDialogError] = useState<DialogError>({
     isOpen: false,
@@ -87,36 +29,52 @@ export function useCoworkingState() {
     message: '',
   });
 
-  // 2. Persist state to LocalStorage
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(config));
-  }, [config]);
+  const serverVersionRef = useRef<number>(0);
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.SHIFTS, JSON.stringify(shifts));
-  }, [shifts]);
+  // Helper to sync state from server
+  const syncWithServer = (data: any) => {
+    const version = data.version || 0;
+    if (version <= serverVersionRef.current) return;
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(members));
-  }, [members]);
+    serverVersionRef.current = version;
+    if (data.config) setConfig(data.config);
+    if (data.shifts) setShifts(data.shifts);
+    if (data.members) setMembers(data.members);
+    if (data.terms) setTerms(data.terms);
+    if (data.sessionNotes) setSessionNotes(data.sessionNotes);
+    if (data.sessionAttendance) setSessionAttendance(data.sessionAttendance);
+    if (data.calendarOverrides) setCalendarOverrides(data.calendarOverrides);
+  };
 
+  // 2. Initial load and background polling
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.TERMS, JSON.stringify(terms));
-  }, [terms]);
+    const fetchInitial = async () => {
+      try {
+        const res = await fetch("/api/data");
+        const data = await res.json();
+        syncWithServer(data);
+      } catch (e) {
+        console.error("Failed to fetch initial data:", e);
+      }
+    };
+    fetchInitial();
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(sessionNotes));
-  }, [sessionNotes]);
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/data");
+        const data = await res.json();
+        if (data.version > serverVersionRef.current) {
+          syncWithServer(data);
+        }
+      } catch (e) {
+        console.error("Failed to poll data from server:", e);
+      }
+    }, 3000);
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(sessionAttendance));
-  }, [sessionAttendance]);
+    return () => clearInterval(pollInterval);
+  }, []);
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.OVERRIDES, JSON.stringify(calendarOverrides));
-  }, [calendarOverrides]);
-
-  // 4. Central Backup History Autosave Tracker
+  // 3. Central Backup History Autosave Tracker (Local storage per browser, nice for recovery)
   const [localHistory, setLocalHistory] = useState<any[]>(() => {
     const saved = localStorage.getItem('coworking_backup_history');
     return saved ? JSON.parse(saved) : [];
@@ -149,7 +107,6 @@ export function useCoworkingState() {
         try {
           const currentData = JSON.parse(jsonString);
           
-          // 1. Prevent automatic empty backup creations if there is no real user data
           if (
             (!currentData.members || currentData.members.length === 0) &&
             (!currentData.shifts || currentData.shifts.length === 0) &&
@@ -158,7 +115,6 @@ export function useCoworkingState() {
             return prev;
           }
 
-          // 2. Prevent duplicate backup entries where data hasn't changed
           if (prev.length > 0) {
             const lastData = JSON.parse(prev[0].data);
             const isSame = 
@@ -170,14 +126,13 @@ export function useCoworkingState() {
               JSON.stringify(currentData.overrides) === JSON.stringify(lastData.overrides);
             
             if (isSame) {
-              return prev; // Skip duplicate history item
+              return prev;
             }
           }
         } catch (e) {
           console.error("Error checking backup uniqueness in hook:", e);
         }
 
-        // Keep only up to 5 history items
         const updated = [
           {
             id: 'hist-' + Date.now(),
@@ -199,23 +154,7 @@ export function useCoworkingState() {
     return () => clearTimeout(timer);
   }, [config, shifts, members, terms, sessionNotes, sessionAttendance, calendarOverrides]);
 
-  // Recalculates all active subscriptions after any overrides change or shifts change
-  const handleRecalculateAllTerms = (latestOverrides: CalendarOverrides = calendarOverrides) => {
-    setTerms((prevTerms) =>
-      prevTerms.map((t) => {
-        const matchingShift = shifts.find((s) => s.id === t.shiftId);
-        if (!matchingShift) return t;
-        const calc = calculateTermSessions(t.startDate, t.sessionsCount, matchingShift.weekDays, latestOverrides);
-        return {
-          ...t,
-          sessions: calc.sessions,
-          endDate: calc.endDate,
-        };
-      })
-    );
-  };
-
-  // Helper to open error dialogs nicely
+  // Helper to open error dialogs
   const showErrorDialog = (title: string, message: string) => {
     setDialogError({ isOpen: true, title, message });
   };
@@ -258,44 +197,53 @@ export function useCoworkingState() {
     return { isConflict: false };
   };
 
-  // 3. Transactions & CRUD Operations
+  // 4. API Operations / REST Transactions
 
-  // Update System capacity configs
-  const updateConfig = (newConfig: Partial<CoworkingConfig>) => {
-    setConfig((prev) => ({ ...prev, ...newConfig }));
+  const updateConfig = async (newConfig: Partial<CoworkingConfig>) => {
+    try {
+      const res = await fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ config: newConfig }),
+      });
+      const db = await res.json();
+      syncWithServer(db);
+    } catch (err) {
+      console.error("Failed to update config:", err);
+    }
   };
 
   // SHIFT CRUD
-  const addShift = (name: string, weekDays: number[], totalRegular = 20, totalPremium = 5) => {
+  const addShift = async (name: string, weekDays: number[], totalRegular = 20, totalPremium = 5) => {
     if (!name.trim()) return;
-    const newShift: Shift = {
-      id: `shift-${Date.now()}`,
-      name: name.trim(),
-      weekDays,
-      totalRegular,
-      totalPremium,
-    };
-    setShifts((prev) => [...prev, newShift]);
+    try {
+      const res = await fetch("/api/shifts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, weekDays, totalRegular, totalPremium }),
+      });
+      const db = await res.json();
+      syncWithServer(db);
+    } catch (err) {
+      console.error("Failed to add shift:", err);
+    }
   };
 
-  const updateShift = (id: string, updated: Partial<Omit<Shift, 'id'>>) => {
-    setShifts((prev) =>
-      prev.map((s) => {
-        if (s.id === id) {
-          const updatedShift = { ...s, ...updated };
-          return updatedShift;
-        }
-        return s;
-      })
-    );
-    // After shifts are updated, recalculate terms using this shift
-    setTimeout(() => {
-      handleRecalculateAllTerms(calendarOverrides);
-    }, 50);
+  const updateShift = async (id: string, updated: Partial<Omit<Shift, 'id'>>) => {
+    try {
+      const res = await fetch(`/api/shifts/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated),
+      });
+      const db = await res.json();
+      syncWithServer(db);
+    } catch (err) {
+      console.error("Failed to update shift:", err);
+    }
   };
 
-  const deleteShift = (id: string) => {
-    // Check if any registered subscriptions use this shift
+  const deleteShift = async (id: string) => {
     const hasRegisteredTerm = terms.some((t) => t.shiftId === id);
     if (hasRegisteredTerm) {
       showErrorDialog(
@@ -305,31 +253,52 @@ export function useCoworkingState() {
       return false;
     }
 
-    setShifts((prev) => prev.filter((s) => s.id !== id));
-    return true;
+    try {
+      const res = await fetch(`/api/shifts/${id}`, {
+        method: "DELETE",
+      });
+      const db = await res.json();
+      syncWithServer(db);
+      return true;
+    } catch (err) {
+      console.error("Failed to delete shift:", err);
+      return false;
+    }
   };
 
   // MEMBER CRUD
-  const addMember = (fullName: string, phone: string) => {
+  const addMember = async (fullName: string, phone: string) => {
     if (!fullName.trim() || !phone.trim()) return null;
-    const newId = `member-${Date.now()}`;
-    const newMember: Member = {
-      id: newId,
-      fullName: fullName.trim(),
-      phone: phone.trim(),
-    };
-    setMembers((prev) => [...prev, newMember]);
-    return newId;
+    try {
+      const res = await fetch("/api/members", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fullName, phone }),
+      });
+      const data = await res.json();
+      syncWithServer(data.db);
+      return data.newId;
+    } catch (err) {
+      console.error("Failed to add member:", err);
+      return null;
+    }
   };
 
-  const updateMember = (id: string, updated: Partial<Omit<Member, 'id'>>) => {
-    setMembers((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, ...updated } : m))
-    );
+  const updateMember = async (id: string, updated: Partial<Omit<Member, 'id'>>) => {
+    try {
+      const res = await fetch(`/api/members/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated),
+      });
+      const db = await res.json();
+      syncWithServer(db);
+    } catch (err) {
+      console.error("Failed to update member:", err);
+    }
   };
 
-  const deleteMember = (id: string) => {
-    // Check if this member has registered terms
+  const deleteMember = async (id: string) => {
     const hasTerms = terms.some((t) => t.memberId === id);
     if (hasTerms) {
       showErrorDialog(
@@ -339,18 +308,31 @@ export function useCoworkingState() {
       return false;
     }
 
-    setMembers((prev) => prev.filter((m) => m.id !== id));
-    return true;
+    try {
+      const res = await fetch(`/api/members/${id}`, {
+        method: "DELETE",
+      });
+      const db = await res.json();
+      syncWithServer(db);
+      return true;
+    } catch (err) {
+      console.error("Failed to delete member:", err);
+      return false;
+    }
   };
 
   // TERM CRUD
-  const addTerm = (memberId: string, shiftId: string, startDate: string, sessionsCount = 12, deskType: 'regular' | 'premium' = 'regular') => {
+  const addTerm = async (
+    memberId: string,
+    shiftId: string,
+    startDate: string,
+    sessionsCount = 12,
+    deskType: 'regular' | 'premium' = 'regular'
+  ) => {
     if (!memberId || !shiftId || !startDate) return null;
 
-    // Normalizing first to cover Persian digit characters conversion
     const normalizedStart = normalizePersianDigits(startDate);
 
-    // Validate date format and validity
     if (!isValidJalaliDate(normalizedStart)) {
       showErrorDialog(
         'خطای تاریخ نامعتبر',
@@ -364,7 +346,6 @@ export function useCoworkingState() {
 
     const calc = calculateTermSessions(normalizedStart, sessionsCount, shiftObj.weekDays, calendarOverrides);
 
-    // Check capacity conflicts for these sessions
     const capacityConflict = checkCapacityConflict(null, shiftId, deskType, calc.sessions);
     if (capacityConflict.isConflict) {
       showErrorDialog(
@@ -375,27 +356,33 @@ export function useCoworkingState() {
       );
     }
 
-    const newId = `term-${Date.now()}`;
-    const newTerm: Term = {
-      id: newId,
-      memberId,
-      shiftId,
-      startDate: normalizedStart,
-      endDate: calc.endDate,
-      sessionsCount,
-      sessions: calc.sessions,
-      deskType,
-    };
-
-    setTerms((prev) => [...prev, newTerm]);
-    return newId;
+    try {
+      const res = await fetch("/api/terms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          memberId,
+          shiftId,
+          startDate: normalizedStart,
+          endDate: calc.endDate,
+          sessionsCount,
+          sessions: calc.sessions,
+          deskType,
+        }),
+      });
+      const data = await res.json();
+      syncWithServer(data.db);
+      return data.newId;
+    } catch (err) {
+      console.error("Failed to add term:", err);
+      return null;
+    }
   };
 
-  const updateTerm = (id: string, updated: Partial<Omit<Term, 'id' | 'endDate' | 'sessions'>>) => {
-    let conflictFound = false;
-    let formatError = false;
-
-    // Normalize and validate startDate if provided in the update package
+  const updateTerm = async (
+    id: string,
+    updated: Partial<Omit<Term, 'id' | 'endDate' | 'sessions'>>
+  ) => {
     if (updated.startDate) {
       const normalizedStart = normalizePersianDigits(updated.startDate);
       if (!isValidJalaliDate(normalizedStart)) {
@@ -403,164 +390,138 @@ export function useCoworkingState() {
           'خطای تاریخ نامعتبر',
           'تاریخ شروع وارد شده معتبر نمی‌باشد. لطفاً فرمت صحیح YYYY/MM/DD را وارد کنید.'
         );
-        formatError = true;
+        return false;
       } else {
         updated.startDate = normalizedStart;
       }
     }
 
-    if (formatError) return false;
+    const termToUpdate = terms.find((t) => t.id === id);
+    if (!termToUpdate) return false;
 
-    setTerms((prev) => {
-      const updatedTerms = prev.map((t) => {
-        if (t.id === id) {
-          const merged = { ...t, ...updated };
-          const shiftObj = shifts.find((s) => s.id === merged.shiftId);
-          if (shiftObj) {
-            const calc = calculateTermSessions(merged.startDate, merged.sessionsCount, shiftObj.weekDays, calendarOverrides);
-            
-            const capacityConflict = checkCapacityConflict(id, merged.shiftId, merged.deskType, calc.sessions, prev);
-            if (capacityConflict.isConflict) {
-              showErrorDialog(
-                'هشدار تکمیل ظرفیت سانس کاری',
-                `توجه: ظرفیت صندلی‌های ${
-                  merged.deskType === 'premium' ? 'بخش ویژه (VIP)' : 'عادی'
-                } در سانس "${shiftObj.name}" در تاریخ ${capacityConflict.dateStr} پر شده است (حد مجاز ظرفیت: ${capacityConflict.capacity} عدد). با این حال، تغییرات با موفقیت ذخیره گردید.`
-              );
-            }
+    const merged = { ...termToUpdate, ...updated };
+    const shiftObj = shifts.find((s) => s.id === merged.shiftId);
+    if (!shiftObj) return false;
 
-            return {
-              ...merged,
-              sessions: calc.sessions,
-              endDate: calc.endDate,
-            };
-          }
-          return merged;
-        }
-        return t;
+    const calc = calculateTermSessions(merged.startDate, merged.sessionsCount, shiftObj.weekDays, calendarOverrides);
+
+    const capacityConflict = checkCapacityConflict(id, merged.shiftId, merged.deskType, calc.sessions, terms);
+    if (capacityConflict.isConflict) {
+      showErrorDialog(
+        'هشدار تکمیل ظرفیت سانس کاری',
+        `توجه: ظرفیت صندلی‌های ${
+          merged.deskType === 'premium' ? 'بخش ویژه (VIP)' : 'عادی'
+        } در سانس "${shiftObj.name}" در تاریخ ${capacityConflict.dateStr} پر شده است (حد مجاز ظرفیت: ${capacityConflict.capacity} عدد). با این حال، تغییرات با موفقیت ذخیره گردید.`
+      );
+    }
+
+    try {
+      const res = await fetch(`/api/terms/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...updated,
+          sessions: calc.sessions,
+          endDate: calc.endDate,
+        }),
       });
-
-      return conflictFound ? prev : updatedTerms;
-    });
-
-    return !conflictFound;
+      const db = await res.json();
+      syncWithServer(db);
+      return true;
+    } catch (err) {
+      console.error("Failed to update term:", err);
+      return false;
+    }
   };
 
-  const deleteTerm = (id: string) => {
-    setTerms((prev) => prev.filter((t) => t.id !== id));
-    // Clean up related session notes
-    setSessionNotes((prev) => {
-      const copy = { ...prev };
-      Object.keys(copy).forEach((key) => {
-        if (key.startsWith(`${id}_`)) {
-          delete copy[key];
-        }
+  const deleteTerm = async (id: string) => {
+    try {
+      const res = await fetch(`/api/terms/${id}`, {
+        method: "DELETE",
       });
-      return copy;
-    });
-    // Clean up related attendance
-    setSessionAttendance((prev) => {
-      const copy = { ...prev };
-      Object.keys(copy).forEach((key) => {
-        if (key.startsWith(`${id}_`)) {
-          delete copy[key];
-        }
-      });
-      return copy;
-    });
-    return true;
+      const db = await res.json();
+      syncWithServer(db);
+      return true;
+    } catch (err) {
+      console.error("Failed to delete term:", err);
+      return false;
+    }
   };
 
   // CALENDAR DAYS TOGGLE
-  const toggleDayStatus = (dateStr: string) => {
-    setCalendarOverrides((prev) => {
-      const currentStatus = prev[dateStr];
-      const copy = { ...prev };
-
-      // Cycle through status: default -> holiday -> working -> default
-      if (!currentStatus) {
-        copy[dateStr] = 'holiday';
-      } else if (currentStatus === 'holiday') {
-        copy[dateStr] = 'working';
-      } else {
-        delete copy[dateStr];
-      }
-
-      // Reactive Recalculation
-      setTimeout(() => {
-        handleRecalculateAllTerms(copy);
-      }, 20);
-
-      return copy;
-    });
+  const toggleDayStatus = async (dateStr: string) => {
+    try {
+      const res = await fetch("/api/overrides", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dateStr }),
+      });
+      const db = await res.json();
+      syncWithServer(db);
+    } catch (err) {
+      console.error("Failed to toggle day status:", err);
+    }
   };
 
   // SESSION NOTES CRUD
-  const saveSessionNote = (termId: string, dateStr: string, note: string) => {
-    const key = `${termId}_${dateStr}`;
-    setSessionNotes((prev) => ({
-      ...prev,
-      [key]: note,
-    }));
+  const saveSessionNote = async (termId: string, dateStr: string, note: string) => {
+    try {
+      const res = await fetch("/api/notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ termId, dateStr, note }),
+      });
+      const db = await res.json();
+      syncWithServer(db);
+    } catch (err) {
+      console.error("Failed to save session note:", err);
+    }
   };
 
   // SESSION ATTENDANCE CRUD
-  const saveSessionAttendance = (termId: string, dateStr: string, status: 'present' | 'absent' | '') => {
-    const key = `${termId}_${dateStr}`;
-    setSessionAttendance((prev) => ({
-      ...prev,
-      [key]: status,
-    }));
+  const saveSessionAttendance = async (termId: string, dateStr: string, status: 'present' | 'absent' | '') => {
+    try {
+      const res = await fetch("/api/attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ termId, dateStr, status }),
+      });
+      const db = await res.json();
+      syncWithServer(db);
+    } catch (err) {
+      console.error("Failed to save session attendance:", err);
+    }
   };
 
   // RESTORE BACKUP DATA
-  const importBackupData = (jsonString: string): boolean => {
+  const importBackupData = async (jsonString: string): Promise<boolean> => {
     try {
       const data = JSON.parse(jsonString);
-      if (data.config) {
-        setConfig(data.config);
-        localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(data.config));
-      }
-      if (data.shifts) {
-        setShifts(data.shifts);
-        localStorage.setItem(STORAGE_KEYS.SHIFTS, JSON.stringify(data.shifts));
-      }
-      if (data.members) {
-        setMembers(data.members);
-        localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(data.members));
-      }
-      if (data.terms) {
-        setTerms(data.terms);
-        localStorage.setItem(STORAGE_KEYS.TERMS, JSON.stringify(data.terms));
-      }
-      if (data.notes) {
-        setSessionNotes(data.notes);
-        localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(data.notes));
-      }
-      if (data.attendance) {
-        setSessionAttendance(data.attendance);
-        localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(data.attendance));
-      }
-      if (data.overrides) {
-        setCalendarOverrides(data.overrides);
-        localStorage.setItem(STORAGE_KEYS.OVERRIDES, JSON.stringify(data.overrides));
-      }
+      const res = await fetch("/api/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data }),
+      });
+      const db = await res.json();
+      syncWithServer(db);
       return true;
     } catch (e) {
-      console.error(e);
+      console.error("Failed to import backup:", e);
       return false;
     }
   };
 
   // WIPE ALL OPERATIONAL DATA COLD RESET
-  const wipeAllData = () => {
-    setConfig({ totalRegularDesks: 20, totalPremiumDesks: 5 });
-    setShifts([]);
-    setMembers([]);
-    setTerms([]);
-    setSessionNotes({});
-    setSessionAttendance({});
-    setCalendarOverrides({});
+  const wipeAllData = async () => {
+    try {
+      const res = await fetch("/api/wipe", {
+        method: "POST",
+      });
+      const db = await res.json();
+      syncWithServer(db);
+    } catch (err) {
+      console.error("Failed to wipe data:", err);
+    }
   };
 
   return {

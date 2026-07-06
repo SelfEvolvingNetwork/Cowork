@@ -29,7 +29,7 @@ interface BackupTabProps {
   calendarOverrides: CalendarOverrides;
   saveSessionNote: (termId: string, dateStr: string, note: string) => void;
   saveSessionAttendance: (termId: string, dateStr: string, status: 'present' | 'absent' | '') => void;
-  importBackupData: (json: string) => boolean;
+  importBackupData: (json: string) => any;
   wipeAllData?: () => void;
   localHistory: LocalHistoryItem[];
   setLocalHistory: React.Dispatch<React.SetStateAction<LocalHistoryItem[]>>;

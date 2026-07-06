@@ -20,12 +20,12 @@ interface ProfileTabProps {
   saveSessionNote: (termId: string, dateStr: string, note: string) => void;
   sessionAttendance: SessionAttendance;
   saveSessionAttendance: (termId: string, dateStr: string, status: 'present' | 'absent' | '') => void;
-  addMember: (fullName: string, phone: string) => string | null;
+  addMember: (fullName: string, phone: string) => any;
   updateMember: (id: string, updated: Partial<Omit<Member, 'id'>>) => void;
-  deleteMember: (id: string) => boolean;
-  addTerm: (memberId: string, shiftId: string, startDate: string, sessionsCount?: number, deskType?: 'regular' | 'premium') => string | null;
-  updateTerm: (id: string, updated: Partial<Omit<Term, 'id' | 'endDate' | 'sessions'>>) => boolean | void;
-  deleteTerm: (id: string) => boolean;
+  deleteMember: (id: string) => any;
+  addTerm: (memberId: string, shiftId: string, startDate: string, sessionsCount?: number, deskType?: 'regular' | 'premium') => any;
+  updateTerm: (id: string, updated: Partial<Omit<Term, 'id' | 'endDate' | 'sessions'>>) => any;
+  deleteTerm: (id: string) => any;
   selectedMemberId?: string | null;
   setSelectedMemberId?: (id: string | null) => void;
   initialTermId?: string | null;

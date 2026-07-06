@@ -7,7 +7,7 @@ interface ShiftsTableProps {
   shifts: Shift[];
   addShift: (name: string, weekDays: number[], totalRegular: number, totalPremium: number) => void;
   updateShift: (id: string, updated: Partial<Omit<Shift, 'id'>>) => void;
-  deleteShift: (id: string) => boolean;
+  deleteShift: (id: string) => any;
   terms?: Term[];
   todayDate?: string;
 }
