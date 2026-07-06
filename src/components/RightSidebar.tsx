@@ -5,15 +5,25 @@ import {
   User, 
   Clock, 
   HardDrive,
-  Building2
+  Building2,
+  RefreshCw
 } from 'lucide-react';
 
 interface RightSidebarProps {
   activeTab: string;
   setActiveTab: (tab: any) => void;
+  isSyncing: boolean;
+  lastSyncedTime: string;
+  manualSync: (silent?: boolean) => Promise<boolean>;
 }
 
-export function RightSidebar({ activeTab, setActiveTab }: RightSidebarProps) {
+export function RightSidebar({ 
+  activeTab, 
+  setActiveTab, 
+  isSyncing, 
+  lastSyncedTime, 
+  manualSync 
+}: RightSidebarProps) {
   const menuItems = [
     { id: 'reports', icon: FileSpreadsheet, title: 'گزارش‌ها', keyHint: 'Alt + 1' },
     { id: 'calendar', icon: Calendar, title: 'تقویم کاری', keyHint: 'Alt + 2' },
@@ -64,6 +74,31 @@ export function RightSidebar({ activeTab, setActiveTab }: RightSidebarProps) {
           );
         })}
       </nav>
+
+      {/* Manual Sync Button with Persian Tooltip and Rotation Animation */}
+      <div className="w-full px-1.5 pt-4 border-t border-slate-800 flex flex-col items-center">
+        <button
+          id="manual-sync-btn"
+          onClick={() => manualSync(false)}
+          disabled={isSyncing}
+          className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-300 relative group cursor-pointer border ${
+            isSyncing 
+              ? 'bg-slate-850 text-amber-400 border-slate-800' 
+              : 'text-slate-400 border-transparent hover:bg-slate-800/40 hover:text-blue-400 hover:border-slate-800/60'
+          }`}
+          title="همگام‌سازی دستی با سرور"
+        >
+          <RefreshCw className={`w-[18px] h-[18px] stroke-[1.8] ${isSyncing ? 'animate-spin' : 'hover:rotate-180 transition-transform duration-500'}`} />
+          
+          {/* Floating Tooltip Indicator - Minimal styling */}
+          <div className="invisible group-hover:visible absolute right-14 bg-slate-950 text-slate-100 text-[10px] font-bold py-1.5 px-2.5 rounded border border-slate-800 whitespace-nowrap z-50 shadow-xl font-sans text-right scale-95 origin-left group-hover:scale-100 transition-all pointer-events-none duration-150 flex flex-col gap-0.5" dir="rtl">
+            <span className="text-slate-200 font-medium">همگام‌سازی دستی داده‌ها</span>
+            <span className="text-[9px] text-slate-400 font-normal">
+              آخرین همگام‌سازی: <span className="font-mono text-blue-400">{lastSyncedTime}</span>
+            </span>
+          </div>
+        </button>
+      </div>
     </aside>
   );
 }

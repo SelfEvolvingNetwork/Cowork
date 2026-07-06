@@ -39,6 +39,9 @@ export default function App() {
     setLocalHistory,
     dialogError,
     closeErrorDialog,
+    isSyncing,
+    lastSyncedTime,
+    manualSync,
   } = useCoworkingState();
 
   const [selectedMemberId, setSelectedMemberId] = React.useState<string | null>(null);
@@ -74,7 +77,13 @@ export default function App() {
     <div id="app-root-layout" className="flex h-screen w-screen overflow-hidden bg-slate-50 text-slate-800 antialiased font-sans" dir="rtl">
       
       {/* 1. Sidebar on the RIGHT (Traditional RTL flow) */}
-      <RightSidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <RightSidebar 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        isSyncing={isSyncing}
+        lastSyncedTime={lastSyncedTime}
+        manualSync={manualSync}
+      />
 
       {/* 2. Main Content Container on the LEFT */}
       <main id="main-content-flow" className={`flex-1 h-full flex flex-col p-[10px] w-full max-w-7xl mx-auto ${

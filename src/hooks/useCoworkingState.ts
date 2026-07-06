@@ -46,32 +46,49 @@ export function useCoworkingState() {
     if (data.calendarOverrides) setCalendarOverrides(data.calendarOverrides);
   };
 
-  // 2. Initial load and background polling
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [lastSyncedTime, setLastSyncedTime] = useState<string>(() => {
+    const now = new Date();
+    return now.toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  });
+
+  const manualSync = async (silent = false): Promise<boolean> => {
+    setIsSyncing(true);
+    try {
+      const res = await fetch("/api/data");
+      const data = await res.json();
+      syncWithServer(data, true); // force state sync to guarantee latest server content
+      const now = new Date();
+      setLastSyncedTime(now.toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      return true;
+    } catch (e) {
+      console.error("Manual sync failed:", e);
+      if (!silent) {
+        showErrorDialog(
+          "خطای ارتباط با سرور",
+          "امکان برقراری ارتباط با سرور برای همگام‌سازی وجود ندارد. لطفا اتصال شبکه خود را بررسی کنید."
+        );
+      }
+      return false;
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // 2. Initial load (Only fetch once on mount)
   useEffect(() => {
     const fetchInitial = async () => {
       try {
         const res = await fetch("/api/data");
         const data = await res.json();
         syncWithServer(data);
+        const now = new Date();
+        setLastSyncedTime(now.toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
       } catch (e) {
         console.error("Failed to fetch initial data:", e);
       }
     };
     fetchInitial();
-
-    const pollInterval = setInterval(async () => {
-      try {
-        const res = await fetch("/api/data");
-        const data = await res.json();
-        if (data.version > serverVersionRef.current) {
-          syncWithServer(data);
-        }
-      } catch (e) {
-        console.error("Failed to poll data from server:", e);
-      }
-    }, 3000);
-
-    return () => clearInterval(pollInterval);
   }, []);
 
   // 3. Central Backup History Autosave Tracker (Local storage per browser, nice for recovery)
@@ -558,5 +575,8 @@ export function useCoworkingState() {
     dialogError,
     closeErrorDialog,
     showErrorDialog,
+    isSyncing,
+    lastSyncedTime,
+    manualSync,
   };
 }
