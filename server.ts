@@ -67,6 +67,112 @@ function recalculateAllTerms(db: DbState) {
   });
 }
 
+function migrateAndNormalizeState(input: any): DbState {
+  if (!input || typeof input !== "object") {
+    return { ...DEFAULT_DB };
+  }
+
+  const config = input.config || {};
+  const rawShifts = Array.isArray(input.shifts) ? input.shifts : [];
+  const rawMembers = Array.isArray(input.members) ? input.members : [];
+  const rawTerms = Array.isArray(input.terms) ? input.terms : [];
+  
+  // Resolve legacy key variations gracefully (e.g. notes -> sessionNotes, overrides -> calendarOverrides)
+  let rawNotes = input.sessionNotes || input.notes || {};
+  let rawAttendance = input.sessionAttendance || input.attendance || {};
+  let rawOverrides = input.calendarOverrides || input.overrides || {};
+
+  if (typeof rawNotes !== "object" || rawNotes === null) rawNotes = {};
+  if (typeof rawAttendance !== "object" || rawAttendance === null) rawAttendance = {};
+  if (typeof rawOverrides !== "object" || rawOverrides === null) rawOverrides = {};
+
+  // Standardize configuration
+  const normalizedConfig = {
+    totalRegularDesks: typeof config.totalRegularDesks === "number" 
+      ? config.totalRegularDesks 
+      : (typeof config.totalDesks === "number" ? config.totalDesks : 20),
+    totalPremiumDesks: typeof config.totalPremiumDesks === "number" 
+      ? config.totalPremiumDesks 
+      : 5
+  };
+
+  // Standardize shifts mapping any legacy key/values
+  const normalizedShifts = rawShifts.map((s: any) => {
+    if (!s || typeof s !== "object") return null;
+    return {
+      id: s.id || `shift-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      name: (s.name || s.title || "").trim(),
+      weekDays: Array.isArray(s.weekDays) ? s.weekDays : (Array.isArray(s.days) ? s.days : []),
+      totalRegular: typeof s.totalRegular === "number" ? s.totalRegular : (typeof s.regularSeats === "number" ? s.regularSeats : 20),
+      totalPremium: typeof s.totalPremium === "number" ? s.totalPremium : (typeof s.premiumSeats === "number" ? s.premiumSeats : 5)
+    };
+  }).filter(Boolean);
+
+  // Standardize members mapping legacy keys like 'name' to 'fullName'
+  const normalizedMembers = rawMembers.map((m: any) => {
+    if (!m || typeof m !== "object") return null;
+    return {
+      id: m.id || `member-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      fullName: (m.fullName || m.name || "").trim(),
+      phone: (m.phone || m.mobile || m.phoneNumber || "").trim()
+    };
+  }).filter(Boolean);
+
+  // Standardize calendar overrides
+  const normalizedOverrides: Record<string, "holiday" | "working"> = {};
+  for (const [key, val] of Object.entries(rawOverrides)) {
+    if (val === "holiday" || val === "working") {
+      normalizedOverrides[key] = val;
+    }
+  }
+
+  // Standardize subscription terms
+  const normalizedTerms = rawTerms.map((t: any) => {
+    if (!t || typeof t !== "object") return null;
+    return {
+      id: t.id || `term-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      memberId: t.memberId || "",
+      shiftId: t.shiftId || "",
+      startDate: t.startDate || "",
+      endDate: t.endDate || "",
+      sessionsCount: typeof t.sessionsCount === "number" ? t.sessionsCount : 12,
+      sessions: Array.isArray(t.sessions) ? t.sessions : [],
+      deskType: t.deskType || "regular"
+    };
+  }).filter(Boolean);
+
+  // Strip non-string or unneeded overhead properties from session details
+  const cleanNotes: Record<string, string> = {};
+  for (const [key, value] of Object.entries(rawNotes)) {
+    if (typeof value === "string") {
+      cleanNotes[key] = value;
+    }
+  }
+
+  const cleanAttendance: Record<string, string> = {};
+  for (const [key, value] of Object.entries(rawAttendance)) {
+    if (typeof value === "string") {
+      cleanAttendance[key] = value;
+    }
+  }
+
+  const cleanState: DbState = {
+    version: typeof input.version === "number" ? input.version : 1,
+    config: normalizedConfig,
+    shifts: normalizedShifts,
+    members: normalizedMembers,
+    terms: normalizedTerms,
+    sessionNotes: cleanNotes,
+    sessionAttendance: cleanAttendance,
+    calendarOverrides: normalizedOverrides
+  };
+
+  // Dynamically recalculate all terms sessions & end dates on-the-fly to keep data aligned
+  recalculateAllTerms(cleanState);
+
+  return cleanState;
+}
+
 const DEFAULT_DB: DbState = {
   version: 1,
   config: { totalRegularDesks: 20, totalPremiumDesks: 5 },
@@ -98,10 +204,13 @@ async function readDb(): Promise<DbState> {
     } catch (e) {}
     try {
       const data = await fs.readFile(DB_PATH, "utf-8");
-      return JSON.parse(data);
+      const parsed = JSON.parse(data);
+      const migrated = migrateAndNormalizeState(parsed);
+      return migrated;
     } catch {
-      await fs.writeFile(DB_PATH, JSON.stringify(DEFAULT_DB, null, 2), "utf-8");
-      return DEFAULT_DB;
+      const defaultState = migrateAndNormalizeState(DEFAULT_DB);
+      await fs.writeFile(DB_PATH, JSON.stringify(defaultState, null, 2), "utf-8");
+      return defaultState;
     }
   });
 }
@@ -109,11 +218,15 @@ async function readDb(): Promise<DbState> {
 async function writeDb(state: DbState): Promise<DbState> {
   return dbQueue.run(async () => {
     state.version = (state.version || 0) + 1;
+    // Strip unnecessary fields and overhead before saving to disk
+    const cleanState = migrateAndNormalizeState(state);
+    cleanState.version = state.version;
+
     try {
       await fs.mkdir(DB_DIR, { recursive: true });
     } catch (e) {}
-    await fs.writeFile(DB_PATH, JSON.stringify(state, null, 2), "utf-8");
-    return state;
+    await fs.writeFile(DB_PATH, JSON.stringify(cleanState, null, 2), "utf-8");
+    return cleanState;
   });
 }
 
@@ -499,18 +612,16 @@ async function startServer() {
       if (!data || typeof data !== "object") {
         return res.status(400).json({ error: "اطلاعات پشتیبان معتبر نمی‌باشد" });
       }
-      const db = await readDb();
-      if (data.config && typeof data.config === "object") db.config = { ...db.config, ...data.config };
-      if (data.shifts && Array.isArray(data.shifts)) db.shifts = data.shifts;
-      if (data.members && Array.isArray(data.members)) db.members = data.members;
-      if (data.terms && Array.isArray(data.terms)) db.terms = data.terms;
-      if (data.notes && typeof data.notes === "object") db.sessionNotes = data.notes;
-      if (data.attendance && typeof data.attendance === "object") db.sessionAttendance = data.attendance;
-      if (data.overrides && typeof data.overrides === "object") db.calendarOverrides = data.overrides;
       
-      recalculateAllTerms(db);
-      await writeDb(db);
-      res.json(db);
+      // Fully migrate and normalize incoming backup to ensure 100% future-proof compatibility
+      const migratedDb = migrateAndNormalizeState(data);
+      
+      // Preserve and increment the database version safely
+      const currentDb = await readDb().catch(() => ({ version: 0 }));
+      migratedDb.version = (currentDb.version || 0) + 1;
+
+      await writeDb(migratedDb);
+      res.json(migratedDb);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
