@@ -29,6 +29,12 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // Bypass service worker cache for all API requests
+  const url = new URL(event.request.url);
+  if (url.pathname.startsWith('/api/')) {
+    return; // Fetch from network normally
+  }
+
   // Offline-first strategy with network fallback
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {

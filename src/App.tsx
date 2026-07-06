@@ -6,7 +6,7 @@ import { ReportsTab } from './components/ReportsTab';
 import { ProfileTab } from './components/ProfileTab';
 import { ShiftsTable } from './components/ShiftsTable';
 import { BackupTab } from './components/BackupTab';
-import { AlertCircle, ShieldAlert } from 'lucide-react';
+import { AlertCircle, ShieldAlert, CheckCircle2, X } from 'lucide-react';
 
 export default function App() {
   const {
@@ -46,6 +46,24 @@ export default function App() {
 
   const [selectedMemberId, setSelectedMemberId] = React.useState<string | null>(null);
   const [selectedTermId, setSelectedTermId] = React.useState<string | null>(null);
+  const [toast, setToast] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const showToast = (type: 'success' | 'error', text: string) => {
+    setToast({ type, text });
+    setTimeout(() => {
+      setToast((curr) => curr?.text === text ? null : curr);
+    }, 4500);
+  };
+
+  const handleManualSync = async () => {
+    const success = await manualSync(false);
+    if (success) {
+      showToast('success', `همگام‌سازی دستی داده‌ها با سرور با موفقیت انجام شد.`);
+    } else {
+      showToast('error', `خطا در برقراری ارتباط با سرور برای همگام‌سازی.`);
+    }
+    return success;
+  };
 
   React.useEffect(() => {
     const handleGlobalTabShortcuts = (e: KeyboardEvent) => {
@@ -82,7 +100,7 @@ export default function App() {
         setActiveTab={setActiveTab} 
         isSyncing={isSyncing}
         lastSyncedTime={lastSyncedTime}
-        manualSync={manualSync}
+        manualSync={handleManualSync}
       />
 
       {/* 2. Main Content Container on the LEFT */}
@@ -225,6 +243,39 @@ export default function App() {
             </div>
 
           </div>
+        </div>
+      )}
+
+      {/* 4. Elegant Toast Notification Banner */}
+      {toast && (
+        <div 
+          id="global-toast-notification" 
+          className="fixed bottom-5 right-5 z-[200] max-w-sm w-full bg-slate-900 border border-slate-800 text-white rounded-xl p-4 shadow-2xl flex items-start gap-3 transition-all duration-300 transform translate-y-0 opacity-100"
+          dir="rtl"
+        >
+          {toast.type === 'success' ? (
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/20">
+              <CheckCircle2 className="w-4.5 h-4.5 text-emerald-400" />
+            </div>
+          ) : (
+            <div className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-400 flex items-center justify-center shrink-0 border border-rose-500/20">
+              <AlertCircle className="w-4.5 h-4.5 text-rose-400" />
+            </div>
+          )}
+          <div className="flex-1 min-w-0 text-right">
+            <h4 className="text-xs font-bold text-slate-200">
+              {toast.type === 'success' ? 'عملیات موفقیت‌آمیز' : 'بروز خطا'}
+            </h4>
+            <p className="text-[10.5px] text-slate-400 mt-1 leading-relaxed font-semibold">
+              {toast.text}
+            </p>
+          </div>
+          <button 
+            onClick={() => setToast(null)}
+            className="text-slate-500 hover:text-slate-300 transition-colors cursor-pointer shrink-0"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
 

@@ -1070,6 +1070,33 @@ export function BackupTab({
   return (
     <div id="backup-manager-view" className="flex-1 flex flex-col h-full bg-slate-50/10 rounded-2xl border border-slate-200/50 overflow-hidden animate-fade-in font-sans p-[10px] space-y-3">
       
+      {/* Dynamic Inline Notification Banner */}
+      {notification && (
+        <div 
+          className={`px-4 py-3 text-xs rounded-xl border flex items-center justify-between gap-3 animate-fade-in shrink-0 text-right ${
+            notification.type === 'success' 
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+              : notification.type === 'refused'
+              ? 'bg-amber-50 border-amber-200 text-amber-900'
+              : 'bg-rose-50 border-rose-200 text-rose-800'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-sm shrink-0">
+              {notification.type === 'success' ? '✅' : '⚠️'}
+            </span>
+            <span className="font-extrabold">{notification.text}</span>
+          </div>
+          <button 
+            type="button" 
+            onClick={() => setNotification(null)}
+            className="text-slate-400 hover:text-slate-650 font-bold cursor-pointer shrink-0"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Conflict Resolution Dialog Modal */}
       {conflictBackup && (
         <BackupConflictDialog

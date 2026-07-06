@@ -55,7 +55,13 @@ export function useCoworkingState() {
   const manualSync = async (silent = false): Promise<boolean> => {
     setIsSyncing(true);
     try {
-      const res = await fetch("/api/data");
+      const res = await fetch(`/api/data?t=${Date.now()}`, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
       const data = await res.json();
       syncWithServer(data, true); // force state sync to guarantee latest server content
       const now = new Date();
@@ -79,7 +85,13 @@ export function useCoworkingState() {
   useEffect(() => {
     const fetchInitial = async () => {
       try {
-        const res = await fetch("/api/data");
+        const res = await fetch(`/api/data?t=${Date.now()}`, {
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        });
         const data = await res.json();
         syncWithServer(data);
         const now = new Date();
@@ -89,6 +101,14 @@ export function useCoworkingState() {
       }
     };
     fetchInitial();
+  }, []);
+
+  // 2b. Automatic periodic background synchronization (every 10 seconds)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      manualSync(true); // silent sync
+    }, 10000); // 10 seconds
+    return () => clearInterval(interval);
   }, []);
 
   // 3. Central Backup History Autosave Tracker (Local storage per browser, nice for recovery)
@@ -224,7 +244,8 @@ export function useCoworkingState() {
         body: JSON.stringify({ config: newConfig }),
       });
       const db = await res.json();
-      syncWithServer(db);
+      syncWithServer(db, true);
+      await manualSync(true);
     } catch (err) {
       console.error("Failed to update config:", err);
     }
@@ -240,7 +261,8 @@ export function useCoworkingState() {
         body: JSON.stringify({ name, weekDays, totalRegular, totalPremium }),
       });
       const db = await res.json();
-      syncWithServer(db);
+      syncWithServer(db, true);
+      await manualSync(true);
     } catch (err) {
       console.error("Failed to add shift:", err);
     }
@@ -254,7 +276,8 @@ export function useCoworkingState() {
         body: JSON.stringify(updated),
       });
       const db = await res.json();
-      syncWithServer(db);
+      syncWithServer(db, true);
+      await manualSync(true);
     } catch (err) {
       console.error("Failed to update shift:", err);
     }
@@ -275,7 +298,8 @@ export function useCoworkingState() {
         method: "DELETE",
       });
       const db = await res.json();
-      syncWithServer(db);
+      syncWithServer(db, true);
+      await manualSync(true);
       return true;
     } catch (err) {
       console.error("Failed to delete shift:", err);
@@ -293,7 +317,8 @@ export function useCoworkingState() {
         body: JSON.stringify({ fullName, phone }),
       });
       const data = await res.json();
-      syncWithServer(data.db);
+      syncWithServer(data.db, true);
+      await manualSync(true);
       return data.newId;
     } catch (err) {
       console.error("Failed to add member:", err);
@@ -309,7 +334,8 @@ export function useCoworkingState() {
         body: JSON.stringify(updated),
       });
       const db = await res.json();
-      syncWithServer(db);
+      syncWithServer(db, true);
+      await manualSync(true);
     } catch (err) {
       console.error("Failed to update member:", err);
     }
@@ -330,7 +356,8 @@ export function useCoworkingState() {
         method: "DELETE",
       });
       const db = await res.json();
-      syncWithServer(db);
+      syncWithServer(db, true);
+      await manualSync(true);
       return true;
     } catch (err) {
       console.error("Failed to delete member:", err);
@@ -388,7 +415,8 @@ export function useCoworkingState() {
         }),
       });
       const data = await res.json();
-      syncWithServer(data.db);
+      syncWithServer(data.db, true);
+      await manualSync(true);
       return data.newId;
     } catch (err) {
       console.error("Failed to add term:", err);
@@ -443,7 +471,8 @@ export function useCoworkingState() {
         }),
       });
       const db = await res.json();
-      syncWithServer(db);
+      syncWithServer(db, true);
+      await manualSync(true);
       return true;
     } catch (err) {
       console.error("Failed to update term:", err);
@@ -457,7 +486,8 @@ export function useCoworkingState() {
         method: "DELETE",
       });
       const db = await res.json();
-      syncWithServer(db);
+      syncWithServer(db, true);
+      await manualSync(true);
       return true;
     } catch (err) {
       console.error("Failed to delete term:", err);
@@ -474,7 +504,8 @@ export function useCoworkingState() {
         body: JSON.stringify({ dateStr }),
       });
       const db = await res.json();
-      syncWithServer(db);
+      syncWithServer(db, true);
+      await manualSync(true);
     } catch (err) {
       console.error("Failed to toggle day status:", err);
     }
@@ -489,7 +520,8 @@ export function useCoworkingState() {
         body: JSON.stringify({ termId, dateStr, note }),
       });
       const db = await res.json();
-      syncWithServer(db);
+      syncWithServer(db, true);
+      await manualSync(true);
     } catch (err) {
       console.error("Failed to save session note:", err);
     }
@@ -504,7 +536,8 @@ export function useCoworkingState() {
         body: JSON.stringify({ termId, dateStr, status }),
       });
       const db = await res.json();
-      syncWithServer(db);
+      syncWithServer(db, true);
+      await manualSync(true);
     } catch (err) {
       console.error("Failed to save session attendance:", err);
     }
@@ -524,6 +557,7 @@ export function useCoworkingState() {
       }
       const db = await res.json();
       syncWithServer(db, true);
+      await manualSync(true);
       return true;
     } catch (e) {
       console.error("Failed to import backup:", e);
@@ -538,7 +572,8 @@ export function useCoworkingState() {
         method: "POST",
       });
       const db = await res.json();
-      syncWithServer(db);
+      syncWithServer(db, true);
+      await manualSync(true);
     } catch (err) {
       console.error("Failed to wipe data:", err);
     }
