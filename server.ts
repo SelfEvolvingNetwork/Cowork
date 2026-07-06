@@ -86,6 +86,14 @@ async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
 
+  // Pre-create the persistent DB directory
+  try {
+    await fs.mkdir(DB_DIR, { recursive: true });
+    console.log(`Directory ${DB_DIR} verified/created.`);
+  } catch (err) {
+    console.error(`Warning: Failed to create DB_DIR: ${DB_DIR}`, err);
+  }
+
   app.use(express.json({ limit: "10mb" }));
 
   // Health check API route
