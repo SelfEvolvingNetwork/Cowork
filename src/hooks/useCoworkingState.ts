@@ -184,85 +184,7 @@ export function useCoworkingState() {
     return () => clearInterval(interval);
   }, []);
 
-  // 3. Central Backup History Autosave Tracker (Local storage per browser, nice for recovery)
-  const [localHistory, setLocalHistory] = useState<any[]>(() => {
-    const saved = localStorage.getItem('coworking_backup_history');
-    return saved ? JSON.parse(saved) : [];
-  });
 
-  useEffect(() => {
-    const autoSaveEnabled = localStorage.getItem('autosave_enabled') !== 'false';
-    if (!autoSaveEnabled) return;
-
-    const timer = setTimeout(() => {
-      const now = new Date();
-      const jalaliTime = now.toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      const jalaliDate = now.toLocaleDateString('fa-IR');
-      const timestampStr = `${jalaliDate} - ${jalaliTime}`;
-
-      const stateObj = {
-        config,
-        shifts,
-        members,
-        terms,
-        notes: sessionNotes,
-        attendance: sessionAttendance,
-        overrides: calendarOverrides,
-        exportedAt: now.toISOString(),
-        appVersion: '1.2.0'
-      };
-      const jsonString = JSON.stringify(stateObj, null, 2);
-
-      setLocalHistory((prev) => {
-        try {
-          const currentData = JSON.parse(jsonString);
-          
-          if (
-            (!currentData.members || currentData.members.length === 0) &&
-            (!currentData.shifts || currentData.shifts.length === 0) &&
-            (!currentData.terms || currentData.terms.length === 0)
-          ) {
-            return prev;
-          }
-
-          if (prev.length > 0) {
-            const lastData = JSON.parse(prev[0].data);
-            const isSame = 
-              JSON.stringify(currentData.members) === JSON.stringify(lastData.members) &&
-              JSON.stringify(currentData.shifts) === JSON.stringify(lastData.shifts) &&
-              JSON.stringify(currentData.terms) === JSON.stringify(lastData.terms) &&
-              JSON.stringify(currentData.notes) === JSON.stringify(lastData.notes) &&
-              JSON.stringify(currentData.attendance) === JSON.stringify(lastData.attendance) &&
-              JSON.stringify(currentData.overrides) === JSON.stringify(lastData.overrides);
-            
-            if (isSame) {
-              return prev;
-            }
-          }
-        } catch (e) {
-          console.error("Error checking backup uniqueness in hook:", e);
-        }
-
-        const updated = [
-          {
-            id: 'hist-' + Date.now(),
-            timestamp: timestampStr,
-            recordsCount: {
-              members: members.length,
-              terms: terms.length,
-              attendance: Object.keys(sessionAttendance).filter(k => sessionAttendance[k]).length,
-            },
-            data: jsonString
-          },
-          ...prev.slice(0, 4)
-        ];
-        localStorage.setItem('coworking_backup_history', JSON.stringify(updated));
-        return updated;
-      });
-    }, 1500);
-
-    return () => clearTimeout(timer);
-  }, [config, shifts, members, terms, sessionNotes, sessionAttendance, calendarOverrides]);
 
   // Helper to open error dialogs
   const showErrorDialog = (title: string, message: string) => {
@@ -725,8 +647,7 @@ export function useCoworkingState() {
     saveSessionAttendance,
     importBackupData,
     wipeAllData,
-    localHistory,
-    setLocalHistory,
+
     dialogError,
     closeErrorDialog,
     showErrorDialog,

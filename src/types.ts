@@ -1,6 +1,10 @@
 export interface CoworkingConfig {
   totalRegularDesks: number;
   totalPremiumDesks: number;
+  academyName?: string;
+  academyPhone?: string;
+  academyAddress?: string;
+  academyLogo?: string;
 }
 
 export interface Shift {

@@ -35,8 +35,6 @@ export default function App() {
     saveSessionAttendance,
     importBackupData,
     wipeAllData,
-    localHistory,
-    setLocalHistory,
     dialogError,
     closeErrorDialog,
     isSyncing,
@@ -182,6 +180,30 @@ export default function App() {
     };
   }, []);
 
+  // Dynamic Title, Favicon & Apple Touch Icon Synchronization based on config
+  React.useEffect(() => {
+    if (config?.academyName) {
+      document.title = `سامانه مدیریت ${config.academyName}`;
+    } else {
+      document.title = 'سامانه مدیریت آموزشگاه پرستو';
+    }
+
+    if (config?.academyLogo) {
+      const updateIcon = (rel: string) => {
+        let link = document.querySelector(`link[rel*='${rel}']`) as HTMLLinkElement;
+        if (!link) {
+          link = document.createElement('link');
+          link.rel = rel;
+          document.head.appendChild(link);
+        }
+        link.href = config.academyLogo!;
+      };
+      updateIcon('icon');
+      updateIcon('shortcut icon');
+      updateIcon('apple-touch-icon');
+    }
+  }, [config?.academyName, config?.academyLogo]);
+
   const handleManualSync = async () => {
     const success = await manualSync(false);
     if (success) {
@@ -233,7 +255,7 @@ export default function App() {
               عدم اتصال به شبکه
             </h1>
             <p className="text-xs text-slate-400 leading-relaxed max-w-sm">
-              برای استفاده از سامانه مدیریت آموزشگاه پرستو، اتصال به اینترنت الزامی است. لطفاً ارتباط دستگاه خود با اینترنت را بررسی کنید و دوباره تلاش نمایید.
+              برای استفاده از سامانه مدیریت {config?.academyName || "آموزشگاه پرستو"}، اتصال به اینترنت الزامی است. لطفاً ارتباط دستگاه خود با اینترنت را بررسی کنید و دوباره تلاش نمایید.
             </p>
           </div>
 
@@ -264,6 +286,8 @@ export default function App() {
         onInstall={handleInstallApp}
         uploadStatus={uploadStatus}
         queueCount={queueCount}
+        academyName={config?.academyName}
+        academyLogo={config?.academyLogo}
       />
 
       {/* 2. Main Content Container on the LEFT */}
@@ -360,8 +384,6 @@ export default function App() {
               saveSessionAttendance={saveSessionAttendance}
               importBackupData={importBackupData}
               wipeAllData={wipeAllData}
-              localHistory={localHistory}
-              setLocalHistory={setLocalHistory}
             />
           </div>
         </div>
@@ -369,7 +391,7 @@ export default function App() {
         {/* Footer Area - No tech bloat as per constraints */}
         {!(activeTab === 'profile' || activeTab === 'reports' || activeTab === 'calendar' || activeTab === 'backup') && (
           <footer className="mt-12 pt-6 border-t border-slate-200 flex justify-between items-center text-[11px] text-slate-500 font-sans">
-            <span>آموزشگاه پرستو</span>
+            <span>{config?.academyName || "آموزشگاه پرستو"}</span>
             <span className="font-mono">۱۴۰۵ © نسخه اتوماسیون سازمانی</span>
           </footer>
         )}

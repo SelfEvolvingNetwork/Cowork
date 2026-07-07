@@ -58,7 +58,14 @@ async function initDbDirectory() {
 
 interface DbState {
   version: number;
-  config: { totalRegularDesks: number; totalPremiumDesks: number };
+  config: { 
+    totalRegularDesks: number; 
+    totalPremiumDesks: number;
+    academyName?: string;
+    academyPhone?: string;
+    academyAddress?: string;
+    academyLogo?: string;
+  };
   shifts: any[];
   members: any[];
   terms: any[];
@@ -114,7 +121,11 @@ function migrateAndNormalizeState(input: any): DbState {
       : (typeof config.totalDesks === "number" ? config.totalDesks : 20),
     totalPremiumDesks: typeof config.totalPremiumDesks === "number" 
       ? config.totalPremiumDesks 
-      : 5
+      : 5,
+    academyName: typeof config.academyName === "string" ? config.academyName : "آموزشگاه پرستو",
+    academyPhone: typeof config.academyPhone === "string" ? config.academyPhone : "",
+    academyAddress: typeof config.academyAddress === "string" ? config.academyAddress : "",
+    academyLogo: typeof config.academyLogo === "string" ? config.academyLogo : "",
   };
 
   // Standardize shifts mapping any legacy key/values
@@ -196,7 +207,14 @@ function migrateAndNormalizeState(input: any): DbState {
 
 const DEFAULT_DB: DbState = {
   version: 1,
-  config: { totalRegularDesks: 20, totalPremiumDesks: 5 },
+  config: { 
+    totalRegularDesks: 20, 
+    totalPremiumDesks: 5,
+    academyName: "آموزشگاه پرستو",
+    academyPhone: "",
+    academyAddress: "",
+    academyLogo: ""
+  },
   shifts: [],
   members: [],
   terms: [],
