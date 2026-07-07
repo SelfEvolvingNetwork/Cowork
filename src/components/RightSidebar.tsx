@@ -40,7 +40,7 @@ export function RightSidebar({
   return (
     <aside id="main-sidebar" className="w-16 h-full bg-slate-900 border-l border-slate-800 flex flex-col items-center py-5 gap-5 shrink-0 select-none">
       {/* App Logo Emblem - Clean, flat icon matching standard design guidelines */}
-      <div className="w-10 h-10 rounded-xl bg-slate-800/80 text-blue-400 flex items-center justify-center font-bold text-lg mb-2 overflow-hidden">
+      <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center font-bold text-lg mb-2 overflow-hidden p-1 shadow-sm">
         <img src="/parastu_logo.png" alt="آموزشگاه پرستو" className="w-8 h-8 object-contain rounded-lg" referrerPolicy="no-referrer" />
       </div>
 
