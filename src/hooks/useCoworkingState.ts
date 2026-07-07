@@ -34,6 +34,73 @@ export function useCoworkingState() {
 
   const serverVersionRef = useRef<number>(0);
 
+  interface SyncOperation {
+    id: string;
+    type: string;
+    url: string;
+    method: 'POST' | 'PUT' | 'DELETE';
+    body?: any;
+  }
+
+  const syncQueueRef = useRef<SyncOperation[]>([]);
+  const [queueCount, setQueueCount] = useState<number>(0);
+  const isProcessingQueueRef = useRef<boolean>(false);
+
+  const processQueue = async () => {
+    if (isProcessingQueueRef.current) return;
+    isProcessingQueueRef.current = true;
+    setUploadStatus('saving');
+
+    while (syncQueueRef.current.length > 0) {
+      const op = syncQueueRef.current[0];
+      try {
+        const res = await fetch(op.url, {
+          method: op.method,
+          headers: { "Content-Type": "application/json" },
+          body: op.body ? JSON.stringify(op.body) : undefined,
+        });
+        if (!res.ok) {
+          throw new Error(`Server returned ${res.status}`);
+        }
+        const data = await res.json();
+        const db = (op.type === 'addMember' || op.type === 'addTerm') ? data.db : data;
+
+        syncQueueRef.current.shift();
+        setQueueCount(syncQueueRef.current.length);
+
+        if (syncQueueRef.current.length === 0) {
+          syncWithServer(db, true);
+          setUploadStatus('saved');
+          setTimeout(() => {
+            setUploadStatus(p => p === 'saved' ? 'idle' : p);
+          }, 3000);
+        }
+      } catch (err) {
+        console.error("Failed to process queue operation:", err, op);
+        setUploadStatus('error');
+        isProcessingQueueRef.current = false;
+        
+        // Wait and retry in 5 seconds
+        setTimeout(() => {
+          processQueue();
+        }, 5000);
+        return;
+      }
+    }
+
+    isProcessingQueueRef.current = false;
+  };
+
+  const addToQueue = (op: Omit<SyncOperation, 'id'>) => {
+    const opWithId: SyncOperation = {
+      ...op,
+      id: `${op.type}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`
+    };
+    syncQueueRef.current.push(opWithId);
+    setQueueCount(syncQueueRef.current.length);
+    processQueue();
+  };
+
   // Helper to sync state from server
   const syncWithServer = (data: any, force = false) => {
     const version = data.version || 0;
@@ -56,6 +123,9 @@ export function useCoworkingState() {
   });
 
   const manualSync = async (silent = false): Promise<boolean> => {
+    if (syncQueueRef.current.length > 0) {
+      return false; // Skip sync if there are pending local operations to avoid overwrites
+    }
     setIsSyncing(true);
     try {
       const res = await fetch(`/api/data?t=${Date.now()}`, {
@@ -240,59 +310,50 @@ export function useCoworkingState() {
   // 4. API Operations / REST Transactions
 
   const updateConfig = async (newConfig: Partial<CoworkingConfig>) => {
-    setUploadStatus('saving');
-    try {
-      const res = await fetch("/api/config", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ config: newConfig }),
-      });
-      const db = await res.json();
-      syncWithServer(db, true);
-      setUploadStatus('saved');
-      setTimeout(() => setUploadStatus(p => p === 'saved' ? 'idle' : p), 3000);
-    } catch (err) {
-      console.error("Failed to update config:", err);
-      setUploadStatus('error');
-    }
+    // Optimistic Update
+    setConfig(prev => ({ ...prev, ...newConfig }));
+
+    addToQueue({
+      type: 'updateConfig',
+      url: "/api/config",
+      method: "POST",
+      body: { config: newConfig }
+    });
   };
 
   // SHIFT CRUD
   const addShift = async (name: string, weekDays: number[], totalRegular = 20, totalPremium = 5) => {
     if (!name.trim()) return;
-    setUploadStatus('saving');
-    try {
-      const res = await fetch("/api/shifts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, weekDays, totalRegular, totalPremium }),
-      });
-      const db = await res.json();
-      syncWithServer(db, true);
-      setUploadStatus('saved');
-      setTimeout(() => setUploadStatus(p => p === 'saved' ? 'idle' : p), 3000);
-    } catch (err) {
-      console.error("Failed to add shift:", err);
-      setUploadStatus('error');
-    }
+    const newId = `shift-${Date.now()}`;
+    const newShift = {
+      id: newId,
+      name: name.trim(),
+      weekDays,
+      totalRegular,
+      totalPremium
+    };
+
+    // Optimistic Update
+    setShifts(prev => [...prev, newShift]);
+
+    addToQueue({
+      type: 'addShift',
+      url: "/api/shifts",
+      method: "POST",
+      body: { id: newId, name, weekDays, totalRegular, totalPremium }
+    });
   };
 
   const updateShift = async (id: string, updated: Partial<Omit<Shift, 'id'>>) => {
-    setUploadStatus('saving');
-    try {
-      const res = await fetch(`/api/shifts/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updated),
-      });
-      const db = await res.json();
-      syncWithServer(db, true);
-      setUploadStatus('saved');
-      setTimeout(() => setUploadStatus(p => p === 'saved' ? 'idle' : p), 3000);
-    } catch (err) {
-      console.error("Failed to update shift:", err);
-      setUploadStatus('error');
-    }
+    // Optimistic Update
+    setShifts(prev => prev.map(s => s.id === id ? { ...s, ...updated } : s));
+
+    addToQueue({
+      type: 'updateShift',
+      url: `/api/shifts/${id}`,
+      method: "PUT",
+      body: updated
+    });
   };
 
   const deleteShift = async (id: string) => {
@@ -305,61 +366,49 @@ export function useCoworkingState() {
       return false;
     }
 
-    setUploadStatus('saving');
-    try {
-      const res = await fetch(`/api/shifts/${id}`, {
-        method: "DELETE",
-      });
-      const db = await res.json();
-      syncWithServer(db, true);
-      setUploadStatus('saved');
-      setTimeout(() => setUploadStatus(p => p === 'saved' ? 'idle' : p), 3000);
-      return true;
-    } catch (err) {
-      console.error("Failed to delete shift:", err);
-      setUploadStatus('error');
-      return false;
-    }
+    // Optimistic Update
+    setShifts(prev => prev.filter(s => s.id !== id));
+
+    addToQueue({
+      type: 'deleteShift',
+      url: `/api/shifts/${id}`,
+      method: "DELETE"
+    });
+    return true;
   };
 
   // MEMBER CRUD
   const addMember = async (fullName: string, phone: string) => {
     if (!fullName.trim() || !phone.trim()) return null;
-    setUploadStatus('saving');
-    try {
-      const res = await fetch("/api/members", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fullName, phone }),
-      });
-      const data = await res.json();
-      syncWithServer(data.db, true);
-      setUploadStatus('saved');
-      setTimeout(() => setUploadStatus(p => p === 'saved' ? 'idle' : p), 3000);
-      return data.newId;
-    } catch (err) {
-      console.error("Failed to add member:", err);
-      setUploadStatus('error');
-      return null;
-    }
+    const newId = `member-${Date.now()}`;
+    const newMember = {
+      id: newId,
+      fullName: fullName.trim(),
+      phone: phone.trim()
+    };
+
+    // Optimistic Update
+    setMembers(prev => [...prev, newMember]);
+
+    addToQueue({
+      type: 'addMember',
+      url: "/api/members",
+      method: "POST",
+      body: { id: newId, fullName, phone }
+    });
+    return newId;
   };
 
   const updateMember = async (id: string, updated: Partial<Omit<Member, 'id'>>) => {
-    setUploadStatus('saving');
-    try {
-      const res = await fetch(`/api/members/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updated),
-      });
-      const db = await res.json();
-      syncWithServer(db, true);
-      setUploadStatus('saved');
-      setTimeout(() => setUploadStatus(p => p === 'saved' ? 'idle' : p), 3000);
-    } catch (err) {
-      console.error("Failed to update member:", err);
-      setUploadStatus('error');
-    }
+    // Optimistic Update
+    setMembers(prev => prev.map(m => m.id === id ? { ...m, ...updated } : m));
+
+    addToQueue({
+      type: 'updateMember',
+      url: `/api/members/${id}`,
+      method: "PUT",
+      body: updated
+    });
   };
 
   const deleteMember = async (id: string) => {
@@ -372,21 +421,15 @@ export function useCoworkingState() {
       return false;
     }
 
-    setUploadStatus('saving');
-    try {
-      const res = await fetch(`/api/members/${id}`, {
-        method: "DELETE",
-      });
-      const db = await res.json();
-      syncWithServer(db, true);
-      setUploadStatus('saved');
-      setTimeout(() => setUploadStatus(p => p === 'saved' ? 'idle' : p), 3000);
-      return true;
-    } catch (err) {
-      console.error("Failed to delete member:", err);
-      setUploadStatus('error');
-      return false;
-    }
+    // Optimistic Update
+    setMembers(prev => prev.filter(m => m.id !== id));
+
+    addToQueue({
+      type: 'deleteMember',
+      url: `/api/members/${id}`,
+      method: "DELETE"
+    });
+    return true;
   };
 
   // TERM CRUD
@@ -430,31 +473,35 @@ export function useCoworkingState() {
       );
     }
 
-    setUploadStatus('saving');
-    try {
-      const res = await fetch("/api/terms", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          memberId,
-          shiftId,
-          startDate: normalizedStart,
-          endDate: calc.endDate,
-          sessionsCount,
-          sessions: calc.sessions,
-          deskType,
-        }),
-      });
-      const data = await res.json();
-      syncWithServer(data.db, true);
-      setUploadStatus('saved');
-      setTimeout(() => setUploadStatus(p => p === 'saved' ? 'idle' : p), 3000);
-      return data.newId;
-    } catch (err) {
-      console.error("Failed to add term:", err);
-      setUploadStatus('error');
-      return null;
-    }
+    const newId = `term-${Date.now()}`;
+    const newTerm = {
+      id: newId,
+      memberId,
+      shiftId,
+      startDate: normalizedStart,
+      endDate: calc.endDate,
+      sessionsCount,
+      sessions: calc.sessions,
+      deskType,
+    };
+
+    // Optimistic Update
+    setTerms(prev => [...prev, newTerm]);
+
+    addToQueue({
+      type: 'addTerm',
+      url: "/api/terms",
+      method: "POST",
+      body: {
+        id: newId,
+        memberId,
+        shiftId,
+        startDate: normalizedStart,
+        sessionsCount,
+        deskType,
+      }
+    });
+    return newId;
   };
 
   const updateTerm = async (
@@ -499,107 +546,116 @@ export function useCoworkingState() {
       );
     }
 
-    setUploadStatus('saving');
-    try {
-      const res = await fetch(`/api/terms/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...updated,
-          sessions: calc.sessions,
-          endDate: calc.endDate,
-        }),
-      });
-      const db = await res.json();
-      syncWithServer(db, true);
-      setUploadStatus('saved');
-      setTimeout(() => setUploadStatus(p => p === 'saved' ? 'idle' : p), 3000);
-      return true;
-    } catch (err) {
-      console.error("Failed to update term:", err);
-      setUploadStatus('error');
-      return false;
-    }
+    // Optimistic Update
+    setTerms(prev => prev.map(t => t.id === id ? { ...t, ...updated, sessions: calc.sessions, endDate: calc.endDate } : t));
+
+    addToQueue({
+      type: 'updateTerm',
+      url: `/api/terms/${id}`,
+      method: "PUT",
+      body: {
+        ...updated,
+        sessions: calc.sessions,
+        endDate: calc.endDate,
+      }
+    });
+    return true;
   };
 
   const deleteTerm = async (id: string) => {
-    setUploadStatus('saving');
-    try {
-      const res = await fetch(`/api/terms/${id}`, {
-        method: "DELETE",
+    // Optimistic Update
+    setTerms(prev => prev.filter(t => t.id !== id));
+
+    // Optimistically clean up session notes and attendance
+    setSessionNotes(prev => {
+      const copy = { ...prev };
+      Object.keys(copy).forEach((key) => {
+        if (key.startsWith(`${id}_`)) {
+          delete copy[key];
+        }
       });
-      const db = await res.json();
-      syncWithServer(db, true);
-      setUploadStatus('saved');
-      setTimeout(() => setUploadStatus(p => p === 'saved' ? 'idle' : p), 3000);
-      return true;
-    } catch (err) {
-      console.error("Failed to delete term:", err);
-      setUploadStatus('error');
-      return false;
-    }
+      return copy;
+    });
+
+    setSessionAttendance(prev => {
+      const copy = { ...prev };
+      Object.keys(copy).forEach((key) => {
+        if (key.startsWith(`${id}_`)) {
+          delete copy[key];
+        }
+      });
+      return copy;
+    });
+
+    addToQueue({
+      type: 'deleteTerm',
+      url: `/api/terms/${id}`,
+      method: "DELETE"
+    });
+    return true;
   };
 
   // CALENDAR DAYS TOGGLE
   const toggleDayStatus = async (dateStr: string) => {
-    setUploadStatus('saving');
-    try {
-      const res = await fetch("/api/overrides", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dateStr }),
-      });
-      const db = await res.json();
-      syncWithServer(db, true);
-      setUploadStatus('saved');
-      setTimeout(() => setUploadStatus(p => p === 'saved' ? 'idle' : p), 3000);
-    } catch (err) {
-      console.error("Failed to toggle day status:", err);
-      setUploadStatus('error');
-    }
+    // Optimistic Update
+    setCalendarOverrides(prev => {
+      const copy = { ...prev };
+      const currentStatus = copy[dateStr];
+      if (!currentStatus) {
+        copy[dateStr] = "holiday";
+      } else if (currentStatus === "holiday") {
+        copy[dateStr] = "working";
+      } else {
+        delete copy[dateStr];
+      }
+      return copy;
+    });
+
+    addToQueue({
+      type: 'toggleDayStatus',
+      url: "/api/overrides",
+      method: "POST",
+      body: { dateStr }
+    });
   };
 
   // SESSION NOTES CRUD
   const saveSessionNote = async (termId: string, dateStr: string, note: string) => {
-    setUploadStatus('saving');
-    try {
-      const res = await fetch("/api/notes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ termId, dateStr, note }),
-      });
-      const db = await res.json();
-      syncWithServer(db, true);
-      setUploadStatus('saved');
-      setTimeout(() => setUploadStatus(p => p === 'saved' ? 'idle' : p), 3000);
-    } catch (err) {
-      console.error("Failed to save session note:", err);
-      setUploadStatus('error');
-    }
+    const key = `${termId}_${dateStr}`;
+
+    // Optimistic Update
+    setSessionNotes(prev => ({ ...prev, [key]: note }));
+
+    addToQueue({
+      type: 'saveSessionNote',
+      url: "/api/notes",
+      method: "POST",
+      body: { termId, dateStr, note }
+    });
   };
 
   // SESSION ATTENDANCE CRUD
   const saveSessionAttendance = async (termId: string, dateStr: string, status: 'present' | 'absent' | '') => {
-    setUploadStatus('saving');
-    try {
-      const res = await fetch("/api/attendance", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ termId, dateStr, status }),
-      });
-      const db = await res.json();
-      syncWithServer(db, true);
-      setUploadStatus('saved');
-      setTimeout(() => setUploadStatus(p => p === 'saved' ? 'idle' : p), 3000);
-    } catch (err) {
-      console.error("Failed to save session attendance:", err);
-      setUploadStatus('error');
-    }
+    const key = `${termId}_${dateStr}`;
+
+    // Optimistic Update
+    setSessionAttendance(prev => ({ ...prev, [key]: status }));
+
+    addToQueue({
+      type: 'saveSessionAttendance',
+      url: "/api/attendance",
+      method: "POST",
+      body: { termId, dateStr, status }
+    });
   };
 
   // RESTORE BACKUP DATA
   const importBackupData = async (jsonString: string): Promise<boolean> => {
     setUploadStatus('saving');
+    // Clear pending operations when importing a backup
+    syncQueueRef.current = [];
+    setQueueCount(0);
+
     try {
       const data = JSON.parse(jsonString);
       const res = await fetch("/api/import", {
@@ -625,6 +681,10 @@ export function useCoworkingState() {
   // WIPE ALL OPERATIONAL DATA COLD RESET
   const wipeAllData = async () => {
     setUploadStatus('saving');
+    // Clear pending operations when wiping data
+    syncQueueRef.current = [];
+    setQueueCount(0);
+
     try {
       const res = await fetch("/api/wipe", {
         method: "POST",
@@ -674,5 +734,6 @@ export function useCoworkingState() {
     lastSyncedTime,
     manualSync,
     uploadStatus,
+    queueCount,
   };
 }

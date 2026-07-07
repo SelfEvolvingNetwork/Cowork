@@ -43,6 +43,7 @@ export default function App() {
     lastSyncedTime,
     manualSync,
     uploadStatus,
+    queueCount,
   } = useCoworkingState();
 
   const [selectedMemberId, setSelectedMemberId] = React.useState<string | null>(null);
@@ -262,6 +263,7 @@ export default function App() {
         isInstallable={isInstallable}
         onInstall={handleInstallApp}
         uploadStatus={uploadStatus}
+        queueCount={queueCount}
       />
 
       {/* 2. Main Content Container on the LEFT */}

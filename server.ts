@@ -388,10 +388,10 @@ async function startServer() {
   // SHIFTS CRUD
   app.post("/api/shifts", async (req, res) => {
     try {
-      const { name, weekDays, totalRegular, totalPremium } = req.body;
+      const { id, name, weekDays, totalRegular, totalPremium } = req.body;
       const db = await readDb();
       const newShift = {
-        id: `shift-${Date.now()}`,
+        id: id || `shift-${Date.now()}`,
         name: (name || "").trim(),
         weekDays: weekDays || [],
         totalRegular: typeof totalRegular === "number" ? totalRegular : 20,
@@ -439,9 +439,9 @@ async function startServer() {
   // MEMBERS CRUD
   app.post("/api/members", async (req, res) => {
     try {
-      const { fullName, phone } = req.body;
+      const { id, fullName, phone } = req.body;
       const db = await readDb();
-      const newId = `member-${Date.now()}`;
+      const newId = id || `member-${Date.now()}`;
       const newMember = {
         id: newId,
         fullName: (fullName || "").trim(),
@@ -488,9 +488,9 @@ async function startServer() {
   // TERMS CRUD
   app.post("/api/terms", async (req, res) => {
     try {
-      const { memberId, shiftId, startDate, sessionsCount, deskType } = req.body;
+      const { id, memberId, shiftId, startDate, sessionsCount, deskType } = req.body;
       const db = await readDb();
-      const newId = `term-${Date.now()}`;
+      const newId = id || `term-${Date.now()}`;
 
       const shiftObj = db.shifts.find((s: any) => s.id === shiftId);
       if (!shiftObj) {

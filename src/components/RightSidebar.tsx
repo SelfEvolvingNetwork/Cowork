@@ -21,6 +21,7 @@ interface RightSidebarProps {
   isInstallable: boolean;
   onInstall: () => void;
   uploadStatus: 'idle' | 'saving' | 'saved' | 'error';
+  queueCount: number;
 }
 
 export function RightSidebar({ 
@@ -31,7 +32,8 @@ export function RightSidebar({
   manualSync,
   isInstallable,
   onInstall,
-  uploadStatus
+  uploadStatus,
+  queueCount
 }: RightSidebarProps) {
   const menuItems = [
     { id: 'reports', icon: FileSpreadsheet, title: 'گزارش‌ها', keyHint: 'Alt + 1' },
@@ -90,16 +92,22 @@ export function RightSidebar({
         <div 
           id="server-upload-status-indicator"
           className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-300 relative group border border-transparent ${
-            uploadStatus === 'saving' ? 'bg-amber-500/10' :
+            queueCount > 0 || uploadStatus === 'saving' ? 'bg-amber-500/10' :
             uploadStatus === 'saved' ? 'bg-emerald-500/10' :
             uploadStatus === 'error' ? 'bg-red-500/10 border-red-500/20' : ''
           }`}
         >
+          {queueCount > 0 && (
+            <span id="sync-queue-badge" className="absolute -top-1 -left-1 bg-amber-500 text-slate-950 text-[9px] font-black w-[17px] h-[17px] rounded-full flex items-center justify-center shadow-md animate-pulse">
+              {queueCount}
+            </span>
+          )}
+
           {uploadStatus === 'error' ? (
             <CloudOff className="w-[18px] h-[18px] stroke-[1.8] text-red-500 animate-bounce" />
           ) : (
             <Cloud className={`w-[18px] h-[18px] stroke-[1.8] ${
-              uploadStatus === 'saving' ? 'text-amber-500 animate-pulse' :
+              queueCount > 0 || uploadStatus === 'saving' ? 'text-amber-500 animate-pulse' :
               uploadStatus === 'saved' ? 'text-emerald-500' : 'text-slate-500 hover:text-slate-400'
             }`} />
           )}
@@ -107,16 +115,18 @@ export function RightSidebar({
           {/* Floating Tooltip Indicator - Minimal styling */}
           <div className="invisible group-hover:visible absolute right-14 bg-slate-950 text-slate-100 text-[10px] font-bold py-1.5 px-2.5 rounded border border-slate-800 whitespace-nowrap z-50 shadow-xl font-sans text-right scale-95 origin-left group-hover:scale-100 transition-all pointer-events-none duration-150 flex flex-col gap-0.5" dir="rtl">
             <span className={`font-black ${
-              uploadStatus === 'saving' ? 'text-amber-400' :
+              queueCount > 0 || uploadStatus === 'saving' ? 'text-amber-400' :
               uploadStatus === 'saved' ? 'text-emerald-400' :
               uploadStatus === 'error' ? 'text-red-400' : 'text-slate-300'
             }`}>
-              {uploadStatus === 'saving' ? 'درحال ارسال به سرور...' :
+              {queueCount > 0 ? `در حال ارسال تغییرات (${queueCount} مورد در صف)` :
+               uploadStatus === 'saving' ? 'درحال ارسال به سرور...' :
                uploadStatus === 'saved' ? 'تغییرات ذخیره شد' :
                uploadStatus === 'error' ? 'خطا در ارسال داده!' : 'وضعیت اتصال سرور'}
             </span>
             <span className="text-[9px] text-slate-400 font-normal">
-              {uploadStatus === 'saving' ? 'در حال ثبت فایل‌های پایگاه داده' :
+              {queueCount > 0 ? 'تغییرات شما به صورت پس‌زمینه و غیرهمزمان ارسال می‌شوند' :
+               uploadStatus === 'saving' ? 'در حال ثبت فایل‌های پایگاه داده' :
                uploadStatus === 'saved' ? 'تمامی اطلاعات روی سرور ثبت شدند' :
                uploadStatus === 'error' ? 'شبکه قطع است یا سرور پاسخ نمیدهد' : 'اتصال پایدار با پایگاه داده'}
             </span>
