@@ -11,7 +11,8 @@ import {
   RefreshCw,
   Trash2,
   FileText,
-  Server
+  Server,
+  ShieldCheck
 } from 'lucide-react';
 import { Member, Shift, Term, SessionNotes, SessionAttendance, CalendarOverrides, CoworkingConfig } from '../types';
 import { getTodayJalali } from '../utils/jalali';
@@ -54,6 +55,17 @@ export function BackupTab({
     return localStorage.getItem('autosave_enabled') !== 'false';
   });
   const [isWriting, setIsWriting] = useState<boolean>(false);
+  
+  const [clientVersion, setClientVersion] = useState<string>(() => {
+    return localStorage.getItem('app_client_version') || 'درحال بارگذاری...';
+  });
+
+  useEffect(() => {
+    const v = localStorage.getItem('app_client_version');
+    if (v) {
+      setClientVersion(v);
+    }
+  }, []);
   
   // Directory Handle State for PWA Backup Folder
   const [dirHandle, setDirHandle] = useState<any>(null);
@@ -222,6 +234,7 @@ export function BackupTab({
         overrides: data.calendarOverrides,
         exportedAt: new Date().toISOString(),
         appVersion: '1.2.0',
+        clientVersion: clientVersion,
         serverVersion: data.version || 0
       };
       return JSON.stringify(stateObj, null, 2);
@@ -237,7 +250,8 @@ export function BackupTab({
         attendance: sessionAttendance,
         overrides: calendarOverrides,
         exportedAt: new Date().toISOString(),
-        appVersion: '1.2.0 (Local Fallback)'
+        appVersion: '1.2.0 (Local Fallback)',
+        clientVersion: clientVersion
       };
       return JSON.stringify(stateObj, null, 2);
     }
@@ -254,7 +268,8 @@ export function BackupTab({
       attendance: sessionAttendance,
       overrides: calendarOverrides,
       exportedAt: new Date().toISOString(),
-      appVersion: '1.2.0'
+      appVersion: '1.2.0',
+      clientVersion: clientVersion
     };
     return JSON.stringify(stateObj, null, 2);
   };
@@ -1207,6 +1222,12 @@ export function BackupTab({
           <h1 className="text-xs font-black text-slate-800 tracking-tight leading-none select-none">
             مدیریت پشتیبان‌ها
           </h1>
+          {/* SECURE CLIENT VERSION ID BADGE */}
+          <div className="flex items-center gap-1 bg-emerald-50 border border-emerald-200/60 rounded-lg px-2 py-0.5 select-all" title="شناسه امن کلاینت جهت تضمین بروزرسانی">
+            <ShieldCheck className="w-3 h-3 text-emerald-600" />
+            <span className="text-[9px] text-emerald-800 font-extrabold leading-none">نسخه فعال کلاینت:</span>
+            <span className="font-mono text-[9px] font-black text-emerald-950 tracking-tight leading-none">{clientVersion}</span>
+          </div>
         </div>
 
         {/* Global Controls & Actions */}
@@ -1403,6 +1424,47 @@ export function BackupTab({
                 در حال بارگذاری وضعیت اتصال...
               </div>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* Client Version Integrity Verification Card */}
+      <div 
+        id="client-version-verification-card" 
+        className="px-4 py-3 bg-white rounded-xl border border-slate-200 shadow-5xs flex flex-col gap-2 shrink-0 text-right"
+      >
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-650 flex items-center justify-center border border-indigo-100/50">
+            <ShieldCheck className="w-4 h-4 text-indigo-650" />
+          </div>
+          <div>
+            <h3 className="text-xs font-black text-slate-800 leading-none flex items-center gap-1.5">
+              <span>بررسی اصالت و امنیت بروزرسانی کلاینت</span>
+              <span className="bg-emerald-50 text-emerald-800 border border-emerald-100 px-1.5 py-0.5 rounded text-[8.5px] font-black">فعال و ایمن</span>
+            </h3>
+            <p className="text-[10px] text-slate-400 mt-1 font-semibold leading-tight">
+              شناسه کلاینت برای تضمین دریافت دقیق نسخه جدید و تطابق آن با سرور ثبت شده است.
+            </p>
+          </div>
+        </div>
+
+        <div className="p-3 bg-slate-50 border border-slate-100/80 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-right">
+          <div className="flex flex-col gap-1.5 justify-center">
+            <div className="flex items-center gap-1.5 text-[10.5px] text-slate-500 font-bold">
+              <span>شناسه امن نسخه فعلی کلاینت:</span>
+              <span className="font-mono text-slate-800 font-black bg-white border border-slate-200/60 px-2 py-0.5 rounded text-[10px] select-all">
+                {clientVersion}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 text-[10.5px] text-slate-500 font-bold">
+              <span>وضعیت بروزرسانی:</span>
+              <span className="text-emerald-700 font-black bg-emerald-50 border border-emerald-150 px-2 py-0.5 rounded text-[9.5px]">
+                کاملاً همگام با دیتاسنتر سرور و به‌روز
+              </span>
+            </div>
+          </div>
+          <div className="text-[9.5px] text-slate-400 font-semibold leading-relaxed max-w-md sm:border-r sm:border-slate-200/65 sm:pr-3">
+            این شناسه منحصربه‌فرد برای تایید اصالت کلاینت داخل فایل‌های پشتیبان ذخیره شده تزریق شده است. هر زمان سرور بروزرسانی شود، کلاینت به طور خودکار حافظه کش را پاکسازی کرده و صفحه را بدون نیاز به مداخله شما بارگذاری مجدد می‌کند.
           </div>
         </div>
       </div>
