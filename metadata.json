@@ -1,6 +1,6 @@
 {
-  "name": "Cowor",
-  "description": "Narm-Afzare Modiriate Fazi-e Kar-e Eshteraki ba Tarigheye Shabe-Kar va Taghvim-e Shamsi",
+  "name": "آموزشگاه پرستو",
+  "description": "سیستم اتوماسیون حضور و غیاب، سانس‌بندی و پشتیبان‌گیری هوشمند آموزشگاه پرستو",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

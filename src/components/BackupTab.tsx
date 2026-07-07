@@ -530,7 +530,7 @@ export function BackupTab({
 
     <!-- REPORT FOOTER -->
     <div class="mt-8 pt-4 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center text-slate-400 text-[10px] gap-2">
-      <span>تولید شده به صورت خودکار توسط سامانه مدیریت فضای کار اشتراکی</span>
+      <span>تولید شده به صورت خودکار توسط آموزشگاه پرستو</span>
       <span class="font-mono">صفحه ۱ از ۱</span>
     </div>
 

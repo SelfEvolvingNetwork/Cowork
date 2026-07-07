@@ -1,7 +1,7 @@
 {
-  "name": "سامانه مدیریت فضای کار اشتراکی",
-  "short_name": "اتوماسیون فضا",
-  "description": "سیستم اتوماسیون حضور و غیاب، سانس‌بندی و پشتیبان‌گیری هوشمند مراجعین فضای کار اشتراکی",
+  "name": "آموزشگاه پرستو",
+  "short_name": "پرستو",
+  "description": "سیستم اتوماسیون حضور و غیاب، سانس‌بندی و پشتیبان‌گیری هوشمند آموزشگاه پرستو",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",
@@ -19,8 +19,8 @@
       "sizes": "512x512"
     },
     {
-      "src": "/icon.svg",
-      "type": "image/svg+xml",
+      "src": "/parastu_logo.png",
+      "type": "image/png",
       "sizes": "any"
     }
   ]

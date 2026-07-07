@@ -244,7 +244,7 @@ export default function App() {
         {/* Footer Area - No tech bloat as per constraints */}
         {!(activeTab === 'profile' || activeTab === 'reports' || activeTab === 'calendar' || activeTab === 'backup') && (
           <footer className="mt-12 pt-6 border-t border-slate-200 flex justify-between items-center text-[11px] text-slate-500 font-sans">
-            <span>سامانه مدیریت فضای کار اشتراکی</span>
+            <span>آموزشگاه پرستو</span>
             <span className="font-mono">۱۴۰۵ © نسخه اتوماسیون سازمانی</span>
           </footer>
         )}
