@@ -672,8 +672,24 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
+    
+    // Serve static files with custom Cache-Control headers based on file type
+    app.use(express.static(distPath, {
+      setHeaders: (res, filePath) => {
+        const fileName = path.basename(filePath);
+        if (fileName === "sw.js" || fileName === "service-worker.js" || filePath.endsWith(".html") || fileName === "manifest.json") {
+          // CRITICAL: Never cache service worker, HTML files, or manifest to guarantee immediate updates
+          res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+        } else {
+          // Cache immutable Vite-hashed assets (JS, CSS, images, etc.) for up to 1 year
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        }
+      }
+    }));
+
     app.get('*', (req, res) => {
+      // Never cache the index.html fallback for client-side routing
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }

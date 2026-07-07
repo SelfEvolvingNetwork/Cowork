@@ -94,6 +94,14 @@ export default function App() {
   React.useEffect(() => {
     const checkVersion = async () => {
       try {
+        // Trigger background service worker update check if available
+        if ('serviceWorker' in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          for (const registration of registrations) {
+            registration.update().catch(() => {});
+          }
+        }
+
         const response = await fetch(`/api/version?t=${Date.now()}`);
         if (!response.ok) return;
         const data = await response.json();
