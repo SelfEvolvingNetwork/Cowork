@@ -6,7 +6,7 @@ import { ReportsTab } from './components/ReportsTab';
 import { ProfileTab } from './components/ProfileTab';
 import { ShiftsTable } from './components/ShiftsTable';
 import { BackupTab } from './components/BackupTab';
-import { AlertCircle, ShieldAlert, CheckCircle2, X } from 'lucide-react';
+import { AlertCircle, ShieldAlert, CheckCircle2, X, Download } from 'lucide-react';
 
 export default function App() {
   const {
@@ -47,6 +47,42 @@ export default function App() {
   const [selectedMemberId, setSelectedMemberId] = React.useState<string | null>(null);
   const [selectedTermId, setSelectedTermId] = React.useState<string | null>(null);
   const [toast, setToast] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [deferredPrompt, setDeferredPrompt] = React.useState<any>(null);
+  const [isInstallable, setIsInstallable] = React.useState(false);
+  const [showInstallGuide, setShowInstallGuide] = React.useState(false);
+
+  React.useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setIsInstallable(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    // Also check if already in standalone mode
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setIsInstallable(false);
+    }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setIsInstallable(false);
+        setDeferredPrompt(null);
+        showToast('success', 'برنامه با موفقیت روی دستگاه شما نصب شد.');
+      }
+    } else {
+      setShowInstallGuide(true);
+    }
+  };
 
   const showToast = (type: 'success' | 'error', text: string) => {
     setToast({ type, text });
@@ -101,6 +137,8 @@ export default function App() {
         isSyncing={isSyncing}
         lastSyncedTime={lastSyncedTime}
         manualSync={handleManualSync}
+        isInstallable={isInstallable}
+        onInstall={handleInstallApp}
       />
 
       {/* 2. Main Content Container on the LEFT */}
@@ -276,6 +314,54 @@ export default function App() {
           >
             <X className="w-3.5 h-3.5" />
           </button>
+        </div>
+      )}
+
+      {/* 5. PWA Install Guide Dialog Modal */}
+      {showInstallGuide && (
+        <div id="install-guide-dialog" className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-xs animate-fade-in" style={{ backgroundColor: 'rgba(15, 23, 42, 0.4)' }}>
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-2xl text-right animate-slide-up">
+            
+            {/* Title */}
+            <div className="flex items-center gap-3 pr-1 pb-3 border-b border-slate-100">
+              <Download className="w-6 h-6 text-blue-600" />
+              <h3 className="text-md font-extrabold text-slate-800">
+                راهنمای نصب نرم‌افزار (PWA)
+              </h3>
+            </div>
+
+            {/* Guide Content */}
+            <div className="text-xs text-slate-600 leading-relaxed mt-4 flex flex-col gap-3">
+              <p>این سامانه به عنوان وب‌اپلیکیشن پیشرونده (PWA) طراحی شده است و بدون نیاز به دانلود از مارکت‌ها، مستقیماً روی دستگاه شما نصب می‌شود:</p>
+              
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex flex-col gap-2">
+                <div className="font-bold text-slate-800">۱. در سیستم‌عامل اندروید و مرورگر کروم:</div>
+                <div className="pr-3 text-[11px] text-slate-500">روی دکمه آبی رنگ نصب در منوی کناری کلیک کنید یا از منوی سه نقطه مرورگر، گزینه <span className="font-bold text-slate-700">Add to Home screen</span> یا <span className="font-bold text-slate-700">Install app</span> را انتخاب نمایید.</div>
+              </div>
+
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex flex-col gap-2">
+                <div className="font-bold text-slate-800">۲. در آیفون و آیپد (مرورگر Safari):</div>
+                <div className="pr-3 text-[11px] text-slate-500">در پایین صفحه روی دکمه اشتراک‌گذاری <span className="font-bold text-slate-700">Share</span> (آیکون مربع با فلش رو به بالا) بزنید و از منوی باز شده، گزینه <span className="font-bold text-slate-700">Add to Home Screen</span> را انتخاب کنید.</div>
+              </div>
+
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex flex-col gap-2">
+                <div className="font-bold text-slate-800">۳. در کامپیوتر و لپ‌تاپ (Chrome / Edge):</div>
+                <div className="pr-3 text-[11px] text-slate-500">در نوار آدرس بالای مرورگر، روی آیکون نصب (شبیه مانیتور یا علامت مثبت) کلیک کنید.</div>
+              </div>
+            </div>
+
+            {/* Close button */}
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                id="close-install-guide-btn"
+                onClick={() => setShowInstallGuide(false)}
+                className="px-5 py-2 text-xs font-bold bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 rounded-xl cursor-pointer transition-colors"
+              >
+                متوجه شدم
+              </button>
+            </div>
+
+          </div>
         </div>
       )}
 
