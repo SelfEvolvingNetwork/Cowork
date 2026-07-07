@@ -91,6 +91,64 @@ export default function App() {
     }, 4500);
   };
 
+  React.useEffect(() => {
+    const checkVersion = async () => {
+      try {
+        const response = await fetch(`/api/version?t=${Date.now()}`);
+        if (!response.ok) return;
+        const data = await response.json();
+        const serverVersion = data.version;
+        if (!serverVersion) return;
+
+        const localVersion = localStorage.getItem('app_client_version');
+        if (localVersion && localVersion !== serverVersion) {
+          console.log(`نسخه جدید کلاینت یافت شد: ${serverVersion}. نسخه فعلی: ${localVersion}. در حال بروزرسانی خودکار...`);
+          
+          // Unregister any active service worker registrations
+          if ('serviceWorker' in navigator) {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            for (const registration of registrations) {
+              await registration.unregister();
+            }
+          }
+          
+          // Clear entire cache storage
+          if ('caches' in window) {
+            const cacheNames = await caches.keys();
+            await Promise.all(cacheNames.map(name => caches.delete(name)));
+          }
+          
+          // Save the new version ID
+          localStorage.setItem('app_client_version', serverVersion);
+          
+          showToast('success', 'نسخه جدید نرم‌افزار آماده است. در حال بروزرسانی و راه‌اندازی مجدد...');
+          
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
+        } else if (!localVersion) {
+          localStorage.setItem('app_client_version', serverVersion);
+        }
+      } catch (err) {
+        console.warn('Could not check app client version:', err);
+      }
+    };
+
+    // Check on startup
+    checkVersion();
+
+    // Check periodically every 2.5 minutes
+    const intervalId = setInterval(checkVersion, 2.5 * 60 * 1000);
+
+    // Also check whenever user focuses/returns to the window/tab
+    window.addEventListener('focus', checkVersion);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('focus', checkVersion);
+    };
+  }, []);
+
   const handleManualSync = async () => {
     const success = await manualSync(false);
     if (success) {

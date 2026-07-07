@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { CoworkingConfig, Shift, Member, Term, SessionNotes, CalendarOverrides, SessionAttendance } from '../types';
-import { calculateTermSessions, getTodayJalali, isValidJalaliDate, normalizePersianDigits } from '../utils/jalali';
+import { calculateTermSessions, calculateTermSessionsWithHistory, getTodayJalali, isValidJalaliDate, normalizePersianDigits } from '../utils/jalali';
 
 export interface DialogError {
   isOpen: boolean;
@@ -388,7 +388,13 @@ export function useCoworkingState() {
     const shiftObj = shifts.find((s) => s.id === shiftId);
     if (!shiftObj) return null;
 
-    const calc = calculateTermSessions(normalizedStart, sessionsCount, shiftObj.weekDays, calendarOverrides);
+    const calc = calculateTermSessionsWithHistory(
+      { id: '', startDate: normalizedStart, sessionsCount },
+      shiftObj.weekDays,
+      calendarOverrides,
+      todayDate,
+      sessionAttendance
+    );
 
     const capacityConflict = checkCapacityConflict(null, shiftId, deskType, calc.sessions);
     if (capacityConflict.isConflict) {
@@ -448,7 +454,13 @@ export function useCoworkingState() {
     const shiftObj = shifts.find((s) => s.id === merged.shiftId);
     if (!shiftObj) return false;
 
-    const calc = calculateTermSessions(merged.startDate, merged.sessionsCount, shiftObj.weekDays, calendarOverrides);
+    const calc = calculateTermSessionsWithHistory(
+      merged,
+      shiftObj.weekDays,
+      calendarOverrides,
+      todayDate,
+      sessionAttendance
+    );
 
     const capacityConflict = checkCapacityConflict(id, merged.shiftId, merged.deskType, calc.sessions, terms);
     if (capacityConflict.isConflict) {

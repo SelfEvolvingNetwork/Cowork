@@ -267,3 +267,92 @@ export function calculateTermSessions(
     endDate: currentDate
   };
 }
+
+/**
+ * Calculates term sessions while preserving historical ones.
+ * If there are sessions in the past (before todayDate) or sessions with recorded attendance,
+ * we keep them exactly as they are. The remaining sessions are calculated from todayDate onwards
+ * using the new shift's weekdays.
+ */
+export function calculateTermSessionsWithHistory(
+  term: { id: string; startDate: string; sessionsCount: number; sessions?: string[] },
+  shiftWeekDays: number[],
+  overrides: Record<string, 'holiday' | 'working'>,
+  todayDate: string,
+  sessionAttendance: Record<string, string>
+): { sessions: string[]; endDate: string } {
+  const sessionsCount = term.sessionsCount || 12;
+  const preservedSessions: string[] = [];
+
+  // 1. Identify which existing sessions should be preserved
+  if (term.sessions && Array.isArray(term.sessions)) {
+    for (const date of term.sessions) {
+      const attendanceKey = `${term.id}_${date}`;
+      const status = sessionAttendance[attendanceKey];
+      const hasAttendance = status === 'present' || status === 'absent';
+      const isPast = date < todayDate;
+      if (isPast || hasAttendance) {
+        preservedSessions.push(date);
+      }
+    }
+  }
+
+  // Ensure they are sorted chronologically
+  preservedSessions.sort();
+
+  // If we already have enough preserved sessions, slice to count and return
+  if (preservedSessions.length >= sessionsCount) {
+    const finalSessions = preservedSessions.slice(0, sessionsCount);
+    return {
+      sessions: finalSessions,
+      endDate: finalSessions[finalSessions.length - 1] || term.startDate
+    };
+  }
+
+  // 2. We need to calculate the remaining sessions
+  const remainingCount = sessionsCount - preservedSessions.length;
+  
+  // Decide where to start calculation for the remaining sessions
+  let startCalculationDate = term.startDate;
+  if (preservedSessions.length > 0) {
+    const lastPreserved = preservedSessions[preservedSessions.length - 1];
+    if (lastPreserved >= todayDate) {
+      startCalculationDate = addDaysJalali(lastPreserved, 1);
+    } else {
+      startCalculationDate = todayDate;
+    }
+  }
+
+  const remainingSessions: string[] = [];
+  let currentDate = startCalculationDate;
+  let safetyCounter = 0;
+
+  while (remainingSessions.length < remainingCount && safetyCounter < 1000) {
+    safetyCounter++;
+    
+    // Check if this date is already in preservedSessions to prevent any duplicates
+    if (!preservedSessions.includes(currentDate)) {
+      const { jy, jm, jd } = parseJalaliString(currentDate);
+      const w = getWeekdayOfJalali(jy, jm, jd);
+
+      if (shiftWeekDays.includes(w)) {
+        const dayIsHoliday = isHoliday(currentDate, overrides);
+        if (!dayIsHoliday) {
+          remainingSessions.push(currentDate);
+        }
+      }
+    }
+
+    if (remainingSessions.length < remainingCount) {
+      currentDate = addDaysJalali(currentDate, 1);
+    }
+  }
+
+  const finalSessions = [...preservedSessions, ...remainingSessions];
+  finalSessions.sort();
+
+  return {
+    sessions: finalSessions,
+    endDate: finalSessions[finalSessions.length - 1] || term.startDate
+  };
+}

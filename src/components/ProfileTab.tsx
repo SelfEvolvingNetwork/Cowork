@@ -243,6 +243,7 @@ export function ProfileTab({
                     shifts={shifts}
                     todayDate={todayDate}
                     calendarOverrides={calendarOverrides}
+                    sessionAttendance={sessionAttendance}
                     addTerm={addTerm}
                     updateTerm={updateTerm}
                     deleteTerm={deleteTerm}

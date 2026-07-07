@@ -2,11 +2,25 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import fs from "fs/promises";
-import { calculateTermSessions } from "./src/utils/jalali";
+import { calculateTermSessions, calculateTermSessionsWithHistory, getTodayJalali } from "./src/utils/jalali";
 
 let DB_DIR = path.join(process.cwd(), "my");
 let DB_PATH = path.join(DB_DIR, "database.json");
 let dirSource = "fallback_local";
+
+let serverVersion = "dev";
+
+async function detectVersion() {
+  try {
+    const distIndexPath = path.join(process.cwd(), "dist", "index.html");
+    const stats = await fs.stat(distIndexPath);
+    serverVersion = `prod-${stats.mtime.getTime()}`;
+    console.log(`Detected production version from dist/index.html mtime: ${serverVersion}`);
+  } catch (err) {
+    serverVersion = `dev-${Date.now()}`;
+    console.log(`Fallback version generated for development: ${serverVersion}`);
+  }
+}
 
 async function initDbDirectory() {
   const envPath = process.env.UPLOAD_PATH;
@@ -55,10 +69,17 @@ interface DbState {
 
 function recalculateAllTerms(db: DbState) {
   if (!db.terms || !Array.isArray(db.terms)) return;
+  const todayDate = getTodayJalali();
   db.terms = db.terms.map((t) => {
     const shift = db.shifts.find((s) => s.id === t.shiftId);
     if (!shift) return t;
-    const calc = calculateTermSessions(t.startDate, t.sessionsCount, shift.weekDays, db.calendarOverrides);
+    const calc = calculateTermSessionsWithHistory(
+      t,
+      shift.weekDays,
+      db.calendarOverrides,
+      todayDate,
+      db.sessionAttendance
+    );
     return {
       ...t,
       sessions: calc.sessions,
@@ -234,6 +255,9 @@ async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
 
+  // Detect and set server build/static version
+  await detectVersion();
+
   // Resolve and verify the secure storage directory
   await initDbDirectory();
 
@@ -250,6 +274,12 @@ async function startServer() {
   // Health check API route
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", service: "coworking-manager" });
+  });
+
+  // Version check API route
+  app.get("/api/version", (req, res) => {
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    res.json({ version: serverVersion });
   });
 
   // Secure folder status check API route
@@ -499,7 +529,13 @@ async function startServer() {
           const shiftObj = db.shifts.find((s: any) => s.id === merged.shiftId);
           if (shiftObj) {
             const sessionsCountVal = typeof merged.sessionsCount === "number" ? merged.sessionsCount : 12;
-            const calc = calculateTermSessions(merged.startDate, sessionsCountVal, shiftObj.weekDays, db.calendarOverrides);
+            const calc = calculateTermSessionsWithHistory(
+              merged,
+              shiftObj.weekDays,
+              db.calendarOverrides,
+              getTodayJalali(),
+              db.sessionAttendance
+            );
             merged.sessions = calc.sessions;
             merged.endDate = calc.endDate;
             merged.sessionsCount = sessionsCountVal;

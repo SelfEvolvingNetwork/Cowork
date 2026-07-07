@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Term, Shift, CalendarOverrides } from '../types';
-import { calculateTermSessions, normalizePersianDigits, isValidJalaliDate } from '../utils/jalali';
+import { Term, Shift, CalendarOverrides, SessionAttendance } from '../types';
+import { calculateTermSessions, calculateTermSessionsWithHistory, normalizePersianDigits, isValidJalaliDate } from '../utils/jalali';
 import { 
   CalendarClock, 
   Plus, 
@@ -20,6 +20,7 @@ interface TermsListTableProps {
   shifts: Shift[];
   todayDate: string;
   calendarOverrides: CalendarOverrides;
+  sessionAttendance: SessionAttendance;
   addTerm: (memberId: string, shiftId: string, startDate: string, sessionsCount?: number, deskType?: 'regular' | 'premium') => string | null;
   updateTerm: (id: string, updated: Partial<Omit<Term, 'id' | 'endDate' | 'sessions'>>) => boolean | void;
   deleteTerm: (id: string) => boolean;
@@ -36,6 +37,7 @@ export function TermsListTable({
   shifts,
   todayDate,
   calendarOverrides,
+  sessionAttendance,
   addTerm,
   updateTerm,
   deleteTerm,
@@ -102,12 +104,23 @@ export function TermsListTable({
 
   // Real-time end date preview for editing a term
   useEffect(() => {
-    if (isEditingTerm && editTermShiftId && editTermStartDate) {
+    if (isEditingTerm && editTermShiftId && editTermStartDate && selectedTermId) {
       const shiftObj = shifts.find((s) => s.id === editTermShiftId);
-      if (shiftObj) {
+      const selectedTerm = terms.find((t) => t.id === selectedTermId);
+      if (shiftObj && selectedTerm) {
         const regex = /^\d{4}\/\d{2}\/\d{2}$/;
         if (regex.test(editTermStartDate)) {
-          const calc = calculateTermSessions(editTermStartDate, editTermSessionsCount, shiftObj.weekDays, calendarOverrides);
+          const calc = calculateTermSessionsWithHistory(
+            {
+              ...selectedTerm,
+              startDate: editTermStartDate,
+              sessionsCount: editTermSessionsCount
+            },
+            shiftObj.weekDays,
+            calendarOverrides,
+            todayDate,
+            sessionAttendance
+          );
           setEditTermEndDatePreview(calc.endDate);
           setEditTermError('');
         } else {
@@ -117,7 +130,7 @@ export function TermsListTable({
     } else {
       setEditTermEndDatePreview('');
     }
-  }, [isEditingTerm, editTermShiftId, editTermStartDate, editTermSessionsCount, shifts, calendarOverrides]);
+  }, [isEditingTerm, editTermShiftId, editTermStartDate, editTermSessionsCount, selectedTermId, terms, shifts, calendarOverrides, todayDate, sessionAttendance]);
 
   const handleSaveNewTerm = () => {
     const normalizedInput = normalizePersianDigits(newTermStartDate);
