@@ -46,6 +46,11 @@ export default function App() {
 
   const [selectedMemberId, setSelectedMemberId] = React.useState<string | null>(null);
   const [selectedTermId, setSelectedTermId] = React.useState<string | null>(null);
+  const [reportFilterOverride, setReportFilterOverride] = React.useState<{
+    shiftId: string;
+    deskType: 'all' | 'regular' | 'premium';
+    status: 'all' | 'current' | 'finished' | 'reserved';
+  } | null>(null);
   const [toast, setToast] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [deferredPrompt, setDeferredPrompt] = React.useState<any>(null);
   const [isInstallable, setIsInstallable] = React.useState(false);
@@ -329,6 +334,8 @@ export default function App() {
                 setSelectedTermId(termId || null);
                 setActiveTab('profile');
               }}
+              filterOverride={reportFilterOverride}
+              onClearFilterOverride={() => setReportFilterOverride(null)}
             />
           </div>
 
@@ -366,6 +373,15 @@ export default function App() {
               deleteShift={deleteShift}
               terms={terms}
               todayDate={todayDate}
+              config={config}
+              onNavigateToReports={(shiftId, deskType) => {
+                setReportFilterOverride({
+                  shiftId,
+                  deskType,
+                  status: 'all' // Show all subscriptions regardless of 'current' status, so they don't miss anything
+                });
+                setActiveTab('reports');
+              }}
             />
           </div>
 

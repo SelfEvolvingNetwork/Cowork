@@ -12,6 +12,12 @@ interface ReportsTabProps {
   sessionAttendance: SessionAttendance;
   saveSessionAttendance: (termId: string, dateStr: string, status: 'present' | 'absent' | '') => void;
   onSelectMember?: (memberId: string, termId?: string) => void;
+  filterOverride?: {
+    shiftId: string;
+    deskType: 'all' | 'regular' | 'premium';
+    status: 'all' | 'current' | 'finished' | 'reserved';
+  } | null;
+  onClearFilterOverride?: () => void;
 }
 
 type SortField = 'fullName' | 'remainingSessionsCount' | 'deskType' | 'shiftName';
@@ -27,6 +33,8 @@ export function ReportsTab({
   sessionAttendance,
   saveSessionAttendance,
   onSelectMember,
+  filterOverride,
+  onClearFilterOverride,
 }: ReportsTabProps) {
   // Filters State
   const [nameFilter, setNameFilter] = useState('');
@@ -35,6 +43,28 @@ export function ReportsTab({
   const [remainingSessionsFilter, setRemainingSessionsFilter] = useState<'all' | 'has_remaining' | 'no_remaining'>('all');
   const [attendanceTodayFilter, setAttendanceTodayFilter] = useState<'all' | 'present' | 'absent' | 'not_marked' | 'no_session_today'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'current' | 'finished' | 'reserved'>('current');
+
+  // React to external filter overrides
+  React.useEffect(() => {
+    if (filterOverride) {
+      if (filterOverride.shiftId !== undefined) {
+        setSelectedShiftId(filterOverride.shiftId);
+      }
+      if (filterOverride.deskType !== undefined) {
+        setDeskTypeFilter(filterOverride.deskType);
+      }
+      if (filterOverride.status !== undefined) {
+        setStatusFilter(filterOverride.status);
+      }
+      // Reset other filters to ensure the filtered records show correctly
+      setNameFilter('');
+      setRemainingSessionsFilter('all');
+      setAttendanceTodayFilter('all');
+      
+      // Notify parent to clear the override state so user can freely change filters afterward
+      onClearFilterOverride?.();
+    }
+  }, [filterOverride, onClearFilterOverride]);
 
   // Sorting State
   const [sortField, setSortField] = useState<SortField>('remainingSessionsCount');

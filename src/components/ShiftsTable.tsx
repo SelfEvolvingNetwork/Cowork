@@ -10,25 +10,48 @@ interface ShiftsTableProps {
   deleteShift: (id: string) => any;
   terms?: Term[];
   todayDate?: string;
+  config?: any;
+  onNavigateToReports?: (shiftId: string, deskType: 'all' | 'regular' | 'premium') => void;
 }
 
-export function ShiftsTable({ shifts, addShift, updateShift, deleteShift, terms = [], todayDate = '' }: ShiftsTableProps) {
+export function ShiftsTable({ 
+  shifts, 
+  addShift, 
+  updateShift, 
+  deleteShift, 
+  terms = [], 
+  todayDate = '',
+  config,
+  onNavigateToReports
+}: ShiftsTableProps) {
+  // Default seat capacities from config or standard fallback
+  const defaultRegular = config?.totalRegularDesks !== undefined ? Number(config.totalRegularDesks) : 20;
+  const defaultPremium = config?.totalPremiumDesks !== undefined ? Number(config.totalPremiumDesks) : 5;
+
   // Inline edit state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editDays, setEditDays] = useState<number[]>([]);
-  const [editTotalRegular, setEditTotalRegular] = useState(20);
-  const [editTotalPremium, setEditTotalPremium] = useState(5);
+  const [editTotalRegular, setEditTotalRegular] = useState(defaultRegular);
+  const [editTotalPremium, setEditTotalPremium] = useState(defaultPremium);
 
   // New row "draft" state
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDays, setNewDays] = useState<number[]>([]);
-  const [newTotalRegular, setNewTotalRegular] = useState(20);
-  const [newTotalPremium, setNewTotalPremium] = useState(5);
+  const [newTotalRegular, setNewTotalRegular] = useState(defaultRegular);
+  const [newTotalPremium, setNewTotalPremium] = useState(defaultPremium);
 
   // Validation feedback
   const [errorText, setErrorText] = useState('');
+
+  // Synchronize new draft default values if config finishes loading or updates
+  useEffect(() => {
+    if (!isAdding) {
+      setNewTotalRegular(defaultRegular);
+      setNewTotalPremium(defaultPremium);
+    }
+  }, [config, isAdding, defaultRegular, defaultPremium]);
 
   useEffect(() => {
     const handleGlobalShortcut = (e: KeyboardEvent) => {
@@ -38,8 +61,8 @@ export function ShiftsTable({ shifts, addShift, updateShift, deleteShift, terms 
           if (!prev) {
             setNewName('');
             setNewDays([]);
-            setNewTotalRegular(20);
-            setNewTotalPremium(5);
+            setNewTotalRegular(defaultRegular);
+            setNewTotalPremium(defaultPremium);
             setEditingId(null);
             setErrorText('');
           }
@@ -49,7 +72,7 @@ export function ShiftsTable({ shifts, addShift, updateShift, deleteShift, terms 
     };
     window.addEventListener('keydown', handleGlobalShortcut);
     return () => window.removeEventListener('keydown', handleGlobalShortcut);
-  }, []);
+  }, [defaultRegular, defaultPremium]);
 
   useEffect(() => {
     if (isAdding) {
@@ -133,8 +156,8 @@ export function ShiftsTable({ shifts, addShift, updateShift, deleteShift, terms 
               setIsAdding(true);
               setNewName('');
               setNewDays([]);
-              setNewTotalRegular(20);
-              setNewTotalPremium(5);
+              setNewTotalRegular(defaultRegular);
+              setNewTotalPremium(defaultPremium);
               setEditingId(null);
               setErrorText('');
             }}
@@ -300,7 +323,13 @@ export function ShiftsTable({ shifts, addShift, updateShift, deleteShift, terms 
                           dir="rtl"
                         />
                       ) : (
-                        <span>{s.name}</span>
+                        <span 
+                          onClick={() => onNavigateToReports?.(s.id, 'all')}
+                          className="hover:text-blue-650 hover:underline cursor-pointer transition-colors duration-150"
+                          title="مشاهده گزارش اعضا و وضعیت این سانس"
+                        >
+                          {s.name}
+                        </span>
                       )}
                     </td>
 
@@ -364,7 +393,8 @@ export function ShiftsTable({ shifts, addShift, updateShift, deleteShift, terms 
                       ) : (
                         <div className="flex items-center justify-center">
                           <span 
-                            className={`inline-flex items-center gap-1.5 font-mono text-xs font-extrabold px-3 py-1.5 border rounded-xl shadow-5xs cursor-help transition-all duration-150 ${
+                            onClick={() => onNavigateToReports?.(s.id, 'regular')}
+                            className={`inline-flex items-center gap-1.5 font-mono text-xs font-extrabold px-3 py-1.5 border rounded-xl shadow-5xs cursor-pointer hover:scale-105 hover:border-blue-300 transition-all duration-150 ${
                               regBusy > regTotal
                                 ? 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-150 animate-pulse'
                                 : regBusy === regTotal
@@ -375,8 +405,8 @@ export function ShiftsTable({ shifts, addShift, updateShift, deleteShift, terms 
                             }`}
                             title={
                               regBusy > regTotal
-                                ? `هشدار تکمیل ظرفیت! ظرفیت کل: ${regTotal} | رزرو فعلی: ${regBusy} (تعداد ${regBusy - regTotal} رزرو مازاد بر ظرفیت)`
-                                : `ظرفیت کل: ${regTotal} صندلی عادی | رزرو شده: ${regBusy} | ظرفیت خالی امروز: ${regVacant}`
+                                ? `هشدار تکمیل ظرفیت! ظرفیت کل: ${regTotal} | رزرو فعلی: ${regBusy} (تعداد ${regBusy - regTotal} رزرو مازاد بر ظرفیت) - برای مشاهده گزارش کلیک کنید`
+                                : `ظرفیت کل: ${regTotal} صندلی عادی | رزرو شده: ${regBusy} | ظرفیت خالی امروز: ${regVacant} - برای مشاهده گزارش کلیک کنید`
                             }
                           >
                             <span className="tabular-nums">{regBusy}</span>
@@ -401,7 +431,8 @@ export function ShiftsTable({ shifts, addShift, updateShift, deleteShift, terms 
                       ) : (
                         <div className="flex items-center justify-center">
                           <span 
-                            className={`inline-flex items-center gap-1.5 font-mono text-xs font-extrabold px-3 py-1.5 border rounded-xl shadow-5xs cursor-help transition-all duration-150 ${
+                            onClick={() => onNavigateToReports?.(s.id, 'premium')}
+                            className={`inline-flex items-center gap-1.5 font-mono text-xs font-extrabold px-3 py-1.5 border rounded-xl shadow-5xs cursor-pointer hover:scale-105 hover:border-blue-300 transition-all duration-150 ${
                               premBusy > premTotal
                                 ? 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-150 animate-pulse'
                                 : premBusy === premTotal
@@ -412,8 +443,8 @@ export function ShiftsTable({ shifts, addShift, updateShift, deleteShift, terms 
                             }`}
                             title={
                               premBusy > premTotal
-                                ? `هشدار تکمیل ظرفیت! ظرفیت کل: ${premTotal} | رزرو فعلی: ${premBusy} (تعداد ${premBusy - premTotal} رزرو مازاد بر ظرفیت)`
-                                : `ظرفیت کل: ${premTotal} صندلی ویژه (VIP) | رزرو شده: ${premBusy} | ظرفیت خالی امروز: ${premVacant}`
+                                ? `هشدار تکمیل ظرفیت! ظرفیت کل: ${premTotal} | رزرو فعلی: ${premBusy} (تعداد ${premBusy - premTotal} رزرو مازاد بر ظرفیت) - برای مشاهده گزارش کلیک کنید`
+                                : `ظرفیت کل: ${premTotal} صندلی ویژه (VIP) | رزرو شده: ${premBusy} | ظرفیت خالی امروز: ${premVacant} - برای مشاهده گزارش کلیک کنید`
                             }
                           >
                             <span className="tabular-nums">{premBusy}</span>
