@@ -3,9 +3,7 @@ const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/parastu_logo.png',
-  '/icon-192.png',
-  '/icon-512.png'
+  '/parastu_logo.png'
 ];
 
 self.addEventListener('install', (event) => {

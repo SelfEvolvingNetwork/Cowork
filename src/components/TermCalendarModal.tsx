@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Shift, SessionNotes, SessionAttendance } from '../types';
+import { Shift, SessionNotes, SessionAttendance, CalendarOverrides } from '../types';
 import { 
   getDaysInJalaliMonth, 
   getWeekdayOfJalali, 
   getJalaliMonthName, 
   formatJalali, 
   parseJalaliString,
-  getWeekdayShortName
+  getWeekdayShortName,
+  isHoliday
 } from '../utils/jalali';
-import { X, Check, Trash2 } from 'lucide-react';
+import { X, Check, Trash2, CalendarClock } from 'lucide-react';
 
 interface TermCalendarModalProps {
   onClose: () => void;
@@ -29,6 +30,7 @@ interface TermCalendarModalProps {
   sessionAttendance: SessionAttendance;
   saveSessionAttendance: (termId: string, dateStr: string, status: 'present' | 'absent' | '') => void;
   isInline?: boolean;
+  calendarOverrides: CalendarOverrides;
 }
 
 export function TermCalendarModal({
@@ -41,6 +43,7 @@ export function TermCalendarModal({
   sessionAttendance,
   saveSessionAttendance,
   isInline = false,
+  calendarOverrides,
 }: TermCalendarModalProps) {
   const [selectedCalYearMonth, setSelectedCalYearMonth] = useState<{ year: number; month: number } | null>(null);
   const [activeCalendarDate, setActiveCalendarDate] = useState<string | null>(null);
@@ -177,10 +180,35 @@ export function TermCalendarModal({
                     </button>
                   );
                 })}
+
+                {/* دکمه انتخاب امروز */}
+                <button
+                  type="button"
+                  id="user-cal-today-btn"
+                  onClick={() => {
+                    const todayPartsNow = parseJalaliString(todayDate);
+                    setSelectedCalYearMonth({ year: todayPartsNow.jy, month: todayPartsNow.jm });
+                    
+                    if (selTermEnriched.sessions.includes(todayDate)) {
+                      setActiveCalendarDate(todayDate);
+                      setEditingNoteDate(todayDate);
+                      const noteKey = `${selTermEnriched.id}_${todayDate}`;
+                      setTempNoteText(sessionNotes[noteKey] || '');
+                      setTempAttStatus(sessionAttendance[noteKey] || '');
+                    } else {
+                      setActiveCalendarDate(todayDate);
+                    }
+                  }}
+                  className="px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all cursor-pointer border bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100 hover:border-amber-300 flex items-center gap-1 shadow-3xs"
+                  title="پرش به ماه جاری و انتخاب تاریخ امروز"
+                >
+                  <CalendarClock className="w-3.5 h-3.5 text-amber-700" />
+                  <span>انتخاب امروز</span>
+                </button>
               </div>
             </div>
             
-            <div className="flex items-center gap-3 text-[10px] font-bold text-slate-500 flex-row-reverse">
+            <div className="flex items-center gap-3 text-[10px] font-bold text-slate-500 flex-row-reverse flex-wrap">
               <div className="flex items-center gap-1 flex-row-reverse">
                 <span className="w-2.5 h-2.5 rounded bg-blue-100 border border-blue-300 inline-block"></span>
                 <span>جلسه ساده</span>
@@ -188,6 +216,10 @@ export function TermCalendarModal({
               <div className="flex items-center gap-1 flex-row-reverse">
                 <span className="w-2.5 h-2.5 rounded bg-amber-50 border border-amber-300 inline-block"></span>
                 <span>دارای یادداشت</span>
+              </div>
+              <div className="flex items-center gap-1 flex-row-reverse">
+                <span className="w-2.5 h-2.5 rounded bg-rose-50 border border-rose-200 inline-block"></span>
+                <span>روز تعطیل</span>
               </div>
               <div className="flex items-center gap-1 flex-row-reverse">
                 <span className="w-2.5 h-2.5 rounded bg-blue-600 inline-block ring-1 ring-blue-600"></span>
@@ -216,20 +248,31 @@ export function TermCalendarModal({
               const isSessionDay = selTermEnriched.sessions.includes(slot.dateStr);
               
               if (!isSessionDay) {
+                const isDayHoliday = isHoliday(slot.dateStr, calendarOverrides);
                 return (
                   <div
                     key={`term-cal-${slot.day}`}
-                    className="flex items-center justify-center p-2 rounded-xl border border-slate-200/70 bg-slate-50/75 text-right transition-all select-none cursor-not-allowed w-full min-h-0"
+                    className={`flex items-center justify-center p-2 rounded-xl border text-right transition-all select-none cursor-not-allowed w-full min-h-0 ${
+                      isDayHoliday 
+                        ? 'bg-rose-50/60 border-rose-150 text-rose-700' 
+                        : 'bg-slate-50/75 border-slate-200/70 text-slate-400'
+                    }`}
                   >
                     <div className="flex items-center justify-between w-full flex-row-reverse gap-1">
                       <div className="flex items-center gap-1 flex-row-reverse">
-                        <span className="text-[17px] font-black font-mono leading-none text-slate-400">
+                        <span className={`text-[17px] font-black font-mono leading-none ${
+                          isDayHoliday ? 'text-rose-600' : 'text-slate-400'
+                        }`}>
                           {slot.day}
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5 flex-row-reverse">
-                        <span className="px-1.5 py-0.5 rounded-lg text-[8.5px] font-bold leading-none shrink-0 border border-slate-200/60 bg-slate-100 text-slate-400 font-sans">
-                          غیرفعال
+                        <span className={`px-1.5 py-0.5 rounded-lg text-[8.5px] font-bold leading-none shrink-0 border ${
+                          isDayHoliday 
+                            ? 'border-rose-200 bg-rose-50 text-rose-600' 
+                            : 'border-slate-200/60 bg-slate-100 text-slate-400'
+                        } font-sans`}>
+                          {isDayHoliday ? 'تعطیل' : 'غیرفعال'}
                         </span>
                       </div>
                     </div>
@@ -243,14 +286,18 @@ export function TermCalendarModal({
               const attVal = sessionAttendance[noteKey] || '';
               const hasNote = noteVal.trim().length > 0;
               const isActive = activeCalendarDate === slot.dateStr;
+              const isToday = todayDate === slot.dateStr;
+              const isDayHoliday = isHoliday(slot.dateStr, calendarOverrides);
 
               const bgClass = isActive
                 ? 'bg-blue-50/80 border-blue-500 ring-2 ring-blue-550/15 shadow-xs scale-[1.01]'
+                : isToday
+                ? 'bg-amber-50/70 hover:bg-amber-100/30 border-amber-300 shadow-xs ring-2 ring-amber-400/20'
                 : hasNote
                 ? 'bg-amber-50/70 hover:bg-amber-100/30 border-amber-300 shadow-xs'
                 : 'bg-white hover:bg-slate-100/50 border-slate-200';
 
-              const textClass = isActive ? 'text-blue-700' : 'text-slate-800';
+              const textClass = isActive ? 'text-blue-700' : isToday ? 'text-amber-700' : 'text-slate-800';
 
               return (
                 <button
@@ -269,6 +316,9 @@ export function TermCalendarModal({
                       <span className={`text-[17px] font-black font-mono leading-none ${textClass}`}>
                         {slot.day}
                       </span>
+                      {isToday && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" title="امروز" />
+                      )}
                     </div>
 
                     {/* Left side: Session Badge or Note indicator */}

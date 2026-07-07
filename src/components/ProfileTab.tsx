@@ -268,6 +268,7 @@ export function ProfileTab({
                       saveSessionNote={saveSessionNote}
                       sessionAttendance={sessionAttendance}
                       saveSessionAttendance={saveSessionAttendance}
+                      calendarOverrides={calendarOverrides}
                     />
                   </div>
                 )}
