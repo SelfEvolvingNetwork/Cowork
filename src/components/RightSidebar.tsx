@@ -7,7 +7,9 @@ import {
   HardDrive,
   Building2,
   RefreshCw,
-  Download
+  Download,
+  Cloud,
+  CloudOff
 } from 'lucide-react';
 
 interface RightSidebarProps {
@@ -18,6 +20,7 @@ interface RightSidebarProps {
   manualSync: (silent?: boolean) => Promise<boolean>;
   isInstallable: boolean;
   onInstall: () => void;
+  uploadStatus: 'idle' | 'saving' | 'saved' | 'error';
 }
 
 export function RightSidebar({ 
@@ -27,7 +30,8 @@ export function RightSidebar({
   lastSyncedTime, 
   manualSync,
   isInstallable,
-  onInstall
+  onInstall,
+  uploadStatus
 }: RightSidebarProps) {
   const menuItems = [
     { id: 'reports', icon: FileSpreadsheet, title: 'گزارش‌ها', keyHint: 'Alt + 1' },
@@ -82,6 +86,43 @@ export function RightSidebar({
 
       {/* Manual Sync & PWA Install Buttons with Persian Tooltips */}
       <div className="w-full px-1.5 pt-4 border-t border-slate-800 flex flex-col items-center gap-3">
+        {/* Server Upload / Sync Status Icon Indicator */}
+        <div 
+          id="server-upload-status-indicator"
+          className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-300 relative group border border-transparent ${
+            uploadStatus === 'saving' ? 'bg-amber-500/10' :
+            uploadStatus === 'saved' ? 'bg-emerald-500/10' :
+            uploadStatus === 'error' ? 'bg-red-500/10 border-red-500/20' : ''
+          }`}
+        >
+          {uploadStatus === 'error' ? (
+            <CloudOff className="w-[18px] h-[18px] stroke-[1.8] text-red-500 animate-bounce" />
+          ) : (
+            <Cloud className={`w-[18px] h-[18px] stroke-[1.8] ${
+              uploadStatus === 'saving' ? 'text-amber-500 animate-pulse' :
+              uploadStatus === 'saved' ? 'text-emerald-500' : 'text-slate-500 hover:text-slate-400'
+            }`} />
+          )}
+
+          {/* Floating Tooltip Indicator - Minimal styling */}
+          <div className="invisible group-hover:visible absolute right-14 bg-slate-950 text-slate-100 text-[10px] font-bold py-1.5 px-2.5 rounded border border-slate-800 whitespace-nowrap z-50 shadow-xl font-sans text-right scale-95 origin-left group-hover:scale-100 transition-all pointer-events-none duration-150 flex flex-col gap-0.5" dir="rtl">
+            <span className={`font-black ${
+              uploadStatus === 'saving' ? 'text-amber-400' :
+              uploadStatus === 'saved' ? 'text-emerald-400' :
+              uploadStatus === 'error' ? 'text-red-400' : 'text-slate-300'
+            }`}>
+              {uploadStatus === 'saving' ? 'درحال ارسال به سرور...' :
+               uploadStatus === 'saved' ? 'تغییرات ذخیره شد' :
+               uploadStatus === 'error' ? 'خطا در ارسال داده!' : 'وضعیت اتصال سرور'}
+            </span>
+            <span className="text-[9px] text-slate-400 font-normal">
+              {uploadStatus === 'saving' ? 'در حال ثبت فایل‌های پایگاه داده' :
+               uploadStatus === 'saved' ? 'تمامی اطلاعات روی سرور ثبت شدند' :
+               uploadStatus === 'error' ? 'شبکه قطع است یا سرور پاسخ نمیدهد' : 'اتصال پایدار با پایگاه داده'}
+            </span>
+          </div>
+        </div>
+
         <button
           id="manual-sync-btn"
           onClick={() => manualSync(false)}

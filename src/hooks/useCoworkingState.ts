@@ -11,6 +11,9 @@ export interface DialogError {
 export function useCoworkingState() {
   const [activeTab, setActiveTab] = useState<'calendar' | 'reports' | 'profile' | 'shifts' | 'backup'>('reports');
 
+  // Define upload/saving to server status
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+
   // Define dynamic today's date
   const [todayDate] = useState<string>(() => getTodayJalali());
 
@@ -103,11 +106,11 @@ export function useCoworkingState() {
     fetchInitial();
   }, []);
 
-  // 2b. Automatic periodic background synchronization (every 10 seconds)
+  // 2b. Automatic periodic background synchronization (every 1 minute)
   useEffect(() => {
     const interval = setInterval(() => {
       manualSync(true); // silent sync
-    }, 10000); // 10 seconds
+    }, 60000); // 1 minute (60000 ms)
     return () => clearInterval(interval);
   }, []);
 
@@ -237,6 +240,7 @@ export function useCoworkingState() {
   // 4. API Operations / REST Transactions
 
   const updateConfig = async (newConfig: Partial<CoworkingConfig>) => {
+    setUploadStatus('saving');
     try {
       const res = await fetch("/api/config", {
         method: "POST",
@@ -245,15 +249,18 @@ export function useCoworkingState() {
       });
       const db = await res.json();
       syncWithServer(db, true);
-      await manualSync(true);
+      setUploadStatus('saved');
+      setTimeout(() => setUploadStatus(p => p === 'saved' ? 'idle' : p), 3000);
     } catch (err) {
       console.error("Failed to update config:", err);
+      setUploadStatus('error');
     }
   };
 
   // SHIFT CRUD
   const addShift = async (name: string, weekDays: number[], totalRegular = 20, totalPremium = 5) => {
     if (!name.trim()) return;
+    setUploadStatus('saving');
     try {
       const res = await fetch("/api/shifts", {
         method: "POST",
@@ -262,13 +269,16 @@ export function useCoworkingState() {
       });
       const db = await res.json();
       syncWithServer(db, true);
-      await manualSync(true);
+      setUploadStatus('saved');
+      setTimeout(() => setUploadStatus(p => p === 'saved' ? 'idle' : p), 3000);
     } catch (err) {
       console.error("Failed to add shift:", err);
+      setUploadStatus('error');
     }
   };
 
   const updateShift = async (id: string, updated: Partial<Omit<Shift, 'id'>>) => {
+    setUploadStatus('saving');
     try {
       const res = await fetch(`/api/shifts/${id}`, {
         method: "PUT",
@@ -277,9 +287,11 @@ export function useCoworkingState() {
       });
       const db = await res.json();
       syncWithServer(db, true);
-      await manualSync(true);
+      setUploadStatus('saved');
+      setTimeout(() => setUploadStatus(p => p === 'saved' ? 'idle' : p), 3000);
     } catch (err) {
       console.error("Failed to update shift:", err);
+      setUploadStatus('error');
     }
   };
 
@@ -293,16 +305,19 @@ export function useCoworkingState() {
       return false;
     }
 
+    setUploadStatus('saving');
     try {
       const res = await fetch(`/api/shifts/${id}`, {
         method: "DELETE",
       });
       const db = await res.json();
       syncWithServer(db, true);
-      await manualSync(true);
+      setUploadStatus('saved');
+      setTimeout(() => setUploadStatus(p => p === 'saved' ? 'idle' : p), 3000);
       return true;
     } catch (err) {
       console.error("Failed to delete shift:", err);
+      setUploadStatus('error');
       return false;
     }
   };
@@ -310,6 +325,7 @@ export function useCoworkingState() {
   // MEMBER CRUD
   const addMember = async (fullName: string, phone: string) => {
     if (!fullName.trim() || !phone.trim()) return null;
+    setUploadStatus('saving');
     try {
       const res = await fetch("/api/members", {
         method: "POST",
@@ -318,15 +334,18 @@ export function useCoworkingState() {
       });
       const data = await res.json();
       syncWithServer(data.db, true);
-      await manualSync(true);
+      setUploadStatus('saved');
+      setTimeout(() => setUploadStatus(p => p === 'saved' ? 'idle' : p), 3000);
       return data.newId;
     } catch (err) {
       console.error("Failed to add member:", err);
+      setUploadStatus('error');
       return null;
     }
   };
 
   const updateMember = async (id: string, updated: Partial<Omit<Member, 'id'>>) => {
+    setUploadStatus('saving');
     try {
       const res = await fetch(`/api/members/${id}`, {
         method: "PUT",
@@ -335,9 +354,11 @@ export function useCoworkingState() {
       });
       const db = await res.json();
       syncWithServer(db, true);
-      await manualSync(true);
+      setUploadStatus('saved');
+      setTimeout(() => setUploadStatus(p => p === 'saved' ? 'idle' : p), 3000);
     } catch (err) {
       console.error("Failed to update member:", err);
+      setUploadStatus('error');
     }
   };
 
@@ -351,16 +372,19 @@ export function useCoworkingState() {
       return false;
     }
 
+    setUploadStatus('saving');
     try {
       const res = await fetch(`/api/members/${id}`, {
         method: "DELETE",
       });
       const db = await res.json();
       syncWithServer(db, true);
-      await manualSync(true);
+      setUploadStatus('saved');
+      setTimeout(() => setUploadStatus(p => p === 'saved' ? 'idle' : p), 3000);
       return true;
     } catch (err) {
       console.error("Failed to delete member:", err);
+      setUploadStatus('error');
       return false;
     }
   };
@@ -406,6 +430,7 @@ export function useCoworkingState() {
       );
     }
 
+    setUploadStatus('saving');
     try {
       const res = await fetch("/api/terms", {
         method: "POST",
@@ -422,10 +447,12 @@ export function useCoworkingState() {
       });
       const data = await res.json();
       syncWithServer(data.db, true);
-      await manualSync(true);
+      setUploadStatus('saved');
+      setTimeout(() => setUploadStatus(p => p === 'saved' ? 'idle' : p), 3000);
       return data.newId;
     } catch (err) {
       console.error("Failed to add term:", err);
+      setUploadStatus('error');
       return null;
     }
   };
@@ -472,6 +499,7 @@ export function useCoworkingState() {
       );
     }
 
+    setUploadStatus('saving');
     try {
       const res = await fetch(`/api/terms/${id}`, {
         method: "PUT",
@@ -484,31 +512,37 @@ export function useCoworkingState() {
       });
       const db = await res.json();
       syncWithServer(db, true);
-      await manualSync(true);
+      setUploadStatus('saved');
+      setTimeout(() => setUploadStatus(p => p === 'saved' ? 'idle' : p), 3000);
       return true;
     } catch (err) {
       console.error("Failed to update term:", err);
+      setUploadStatus('error');
       return false;
     }
   };
 
   const deleteTerm = async (id: string) => {
+    setUploadStatus('saving');
     try {
       const res = await fetch(`/api/terms/${id}`, {
         method: "DELETE",
       });
       const db = await res.json();
       syncWithServer(db, true);
-      await manualSync(true);
+      setUploadStatus('saved');
+      setTimeout(() => setUploadStatus(p => p === 'saved' ? 'idle' : p), 3000);
       return true;
     } catch (err) {
       console.error("Failed to delete term:", err);
+      setUploadStatus('error');
       return false;
     }
   };
 
   // CALENDAR DAYS TOGGLE
   const toggleDayStatus = async (dateStr: string) => {
+    setUploadStatus('saving');
     try {
       const res = await fetch("/api/overrides", {
         method: "POST",
@@ -517,14 +551,17 @@ export function useCoworkingState() {
       });
       const db = await res.json();
       syncWithServer(db, true);
-      await manualSync(true);
+      setUploadStatus('saved');
+      setTimeout(() => setUploadStatus(p => p === 'saved' ? 'idle' : p), 3000);
     } catch (err) {
       console.error("Failed to toggle day status:", err);
+      setUploadStatus('error');
     }
   };
 
   // SESSION NOTES CRUD
   const saveSessionNote = async (termId: string, dateStr: string, note: string) => {
+    setUploadStatus('saving');
     try {
       const res = await fetch("/api/notes", {
         method: "POST",
@@ -533,14 +570,17 @@ export function useCoworkingState() {
       });
       const db = await res.json();
       syncWithServer(db, true);
-      await manualSync(true);
+      setUploadStatus('saved');
+      setTimeout(() => setUploadStatus(p => p === 'saved' ? 'idle' : p), 3000);
     } catch (err) {
       console.error("Failed to save session note:", err);
+      setUploadStatus('error');
     }
   };
 
   // SESSION ATTENDANCE CRUD
   const saveSessionAttendance = async (termId: string, dateStr: string, status: 'present' | 'absent' | '') => {
+    setUploadStatus('saving');
     try {
       const res = await fetch("/api/attendance", {
         method: "POST",
@@ -549,14 +589,17 @@ export function useCoworkingState() {
       });
       const db = await res.json();
       syncWithServer(db, true);
-      await manualSync(true);
+      setUploadStatus('saved');
+      setTimeout(() => setUploadStatus(p => p === 'saved' ? 'idle' : p), 3000);
     } catch (err) {
       console.error("Failed to save session attendance:", err);
+      setUploadStatus('error');
     }
   };
 
   // RESTORE BACKUP DATA
   const importBackupData = async (jsonString: string): Promise<boolean> => {
+    setUploadStatus('saving');
     try {
       const data = JSON.parse(jsonString);
       const res = await fetch("/api/import", {
@@ -569,25 +612,30 @@ export function useCoworkingState() {
       }
       const db = await res.json();
       syncWithServer(db, true);
-      await manualSync(true);
+      setUploadStatus('saved');
+      setTimeout(() => setUploadStatus(p => p === 'saved' ? 'idle' : p), 3000);
       return true;
     } catch (e) {
       console.error("Failed to import backup:", e);
+      setUploadStatus('error');
       return false;
     }
   };
 
   // WIPE ALL OPERATIONAL DATA COLD RESET
   const wipeAllData = async () => {
+    setUploadStatus('saving');
     try {
       const res = await fetch("/api/wipe", {
         method: "POST",
       });
       const db = await res.json();
       syncWithServer(db, true);
-      await manualSync(true);
+      setUploadStatus('saved');
+      setTimeout(() => setUploadStatus(p => p === 'saved' ? 'idle' : p), 3000);
     } catch (err) {
       console.error("Failed to wipe data:", err);
+      setUploadStatus('error');
     }
   };
 
@@ -625,5 +673,6 @@ export function useCoworkingState() {
     isSyncing,
     lastSyncedTime,
     manualSync,
+    uploadStatus,
   };
 }

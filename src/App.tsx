@@ -42,6 +42,7 @@ export default function App() {
     isSyncing,
     lastSyncedTime,
     manualSync,
+    uploadStatus,
   } = useCoworkingState();
 
   const [selectedMemberId, setSelectedMemberId] = React.useState<string | null>(null);
@@ -260,6 +261,7 @@ export default function App() {
         manualSync={handleManualSync}
         isInstallable={isInstallable}
         onInstall={handleInstallApp}
+        uploadStatus={uploadStatus}
       />
 
       {/* 2. Main Content Container on the LEFT */}
