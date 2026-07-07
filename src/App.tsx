@@ -6,7 +6,7 @@ import { ReportsTab } from './components/ReportsTab';
 import { ProfileTab } from './components/ProfileTab';
 import { ShiftsTable } from './components/ShiftsTable';
 import { BackupTab } from './components/BackupTab';
-import { AlertCircle, ShieldAlert, CheckCircle2, X, Download } from 'lucide-react';
+import { AlertCircle, ShieldAlert, CheckCircle2, X, Download, WifiOff, RefreshCw } from 'lucide-react';
 
 export default function App() {
   const {
@@ -50,6 +50,29 @@ export default function App() {
   const [deferredPrompt, setDeferredPrompt] = React.useState<any>(null);
   const [isInstallable, setIsInstallable] = React.useState(false);
   const [showInstallGuide, setShowInstallGuide] = React.useState(false);
+  const [isOffline, setIsOffline] = React.useState(!navigator.onLine);
+
+  React.useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const handleCheckConnection = () => {
+    setIsOffline(!navigator.onLine);
+    if (navigator.onLine) {
+      showToast('success', 'اتصال اینترنت شما با موفقیت برقرار شد.');
+    } else {
+      showToast('error', 'هنوز اتصالی به اینترنت برقرار نشده است.');
+    }
+  };
 
   React.useEffect(() => {
     const handleBeforeInstallPrompt = (e: any) => {
@@ -192,6 +215,38 @@ export default function App() {
     window.addEventListener('keydown', handleGlobalTabShortcuts);
     return () => window.removeEventListener('keydown', handleGlobalTabShortcuts);
   }, [setActiveTab]);
+
+  if (isOffline) {
+    return (
+      <div id="offline-screen" className="flex flex-col items-center justify-center h-screen w-screen bg-slate-950 text-slate-100 p-6 font-sans text-center" dir="rtl">
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-8 shadow-2xl flex flex-col items-center gap-6">
+          {/* Pulsing visual icon */}
+          <div className="relative flex items-center justify-center w-20 h-20 bg-red-950/40 border border-red-500/30 rounded-2xl">
+            <WifiOff className="w-10 h-10 text-red-500" />
+            <span className="absolute inset-0 rounded-2xl bg-red-500/10 animate-ping"></span>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <h1 className="text-xl font-extrabold text-white tracking-tight">
+              عدم اتصال به شبکه
+            </h1>
+            <p className="text-xs text-slate-400 leading-relaxed max-w-sm">
+              برای استفاده از سامانه مدیریت آموزشگاه پرستو، اتصال به اینترنت الزامی است. لطفاً ارتباط دستگاه خود با اینترنت را بررسی کنید و دوباره تلاش نمایید.
+            </p>
+          </div>
+
+          <button
+            id="retry-connection-btn"
+            onClick={handleCheckConnection}
+            className="flex items-center justify-center gap-2 w-full py-3 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl cursor-pointer transition-all shadow-lg shadow-blue-900/20 active:scale-95"
+          >
+            <RefreshCw className="w-4 h-4" />
+            بررسی مجدد اتصال
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div id="app-root-layout" className="flex h-screen w-screen overflow-hidden bg-slate-50 text-slate-800 antialiased font-sans" dir="rtl">
