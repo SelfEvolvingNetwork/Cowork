@@ -8,7 +8,12 @@ import {
   Trash2,
   Server,
   ShieldCheck,
-  Settings
+  Settings,
+  Cpu,
+  User,
+  Globe,
+  Link,
+  Terminal
 } from 'lucide-react';
 import { Member, Shift, Term, SessionNotes, SessionAttendance, CalendarOverrides, CoworkingConfig } from '../types';
 
@@ -61,44 +66,6 @@ export function BackupTab({
     }, 4500);
   };
 
-  // H14M OS States
-  const [h14mStatus, setH14mStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [h14mUserData, setH14mUserData] = useState<{
-    username: string;
-    role: string;
-    public_key: string;
-    connected_app?: {
-      id: string;
-      name: string;
-      url: string;
-    };
-    system_time?: string;
-  } | null>(null);
-  const [h14mError, setH14mError] = useState<string | null>(null);
-
-  const fetchH14mUserInfo = async () => {
-    setH14mStatus('loading');
-    setH14mError(null);
-    try {
-      const res = await fetch("/api/h14m/user-info");
-      if (!res.ok) {
-        throw new Error(`خطای سرور: ${res.status}`);
-      }
-      const data = await res.json();
-      if (data.success && data.user) {
-        setH14mUserData(data.user);
-        setH14mStatus('success');
-        showToast('success', 'اطلاعات عمومی کاربر H14M با موفقیت دریافت شد.');
-      } else {
-        throw new Error(data.error || "پاسخ نامعتبر از هسته سیستم‌عامل H14M");
-      }
-    } catch (err: any) {
-      setH14mStatus('error');
-      setH14mError(err.message || "خطا در ارتباط با وب‌سرویس هسته H14M");
-      showToast('error', err.message || "خطا در ارتباط با وب‌سرویس هسته H14M");
-    }
-  };
-
   // Secure Server Folder status state
   const [secureFolderStatus, setSecureFolderStatus] = useState<{
     status: 'ok' | 'error' | 'loading' | 'uninitialized';
@@ -135,8 +102,49 @@ export function BackupTab({
     }
   };
 
+  // H14M OS Core integration states (M14H Document)
+  const [h14mStatus, setH14mStatus] = useState<{
+    connected: boolean;
+    lastConnect: { timestamp: number; method: string; headers: any; body: any } | null;
+    appId: string;
+  } | null>(null);
+  const [h14mUserInfo, setH14mUserInfo] = useState<any>(null);
+  const [h14mLoading, setH14mLoading] = useState<boolean>(false);
+  const [h14mError, setH14mError] = useState<string | null>(null);
+
+  const fetchH14mInfo = async () => {
+    setH14mLoading(true);
+    setH14mError(null);
+    try {
+      // 1. Fetch local connection state tracking
+      const statusRes = await fetch("/api/h14m/status");
+      if (statusRes.ok) {
+        const statusData = await statusRes.json();
+        setH14mStatus(statusData);
+      }
+
+      // 2. Fetch user details via proxy to H14M OS Core (secures secret token)
+      const userInfoRes = await fetch("/api/h14m/user-info");
+      if (userInfoRes.ok) {
+        const userInfoData = await userInfoRes.json();
+        if (userInfoData.success) {
+          setH14mUserInfo(userInfoData.user);
+        } else {
+          setH14mError(userInfoData.error || "خطا در دریافت اطلاعات کاربر");
+        }
+      } else {
+        setH14mError(`خطای ارتباط با سرور: ${userInfoRes.status}`);
+      }
+    } catch (err: any) {
+      setH14mError(err.message || "خطا در ارتباط با سرور");
+    } finally {
+      setH14mLoading(false);
+    }
+  };
+
   useEffect(() => {
     checkSecureFolderStatus();
+    fetchH14mInfo();
   }, []);
 
   // File import input ref
@@ -745,6 +753,92 @@ export function BackupTab({
                 </td>
               </tr>
 
+              {/* H14M OS Integration */}
+              <tr>
+                <td className="py-3.5 pl-3">
+                  <div className="flex items-center gap-1.5 font-extrabold text-slate-800">
+                    <Cpu className="w-4 h-4 text-indigo-600" />
+                    <span>اتصال به هسته سیستم عامل H14M (سند M14H)</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400 font-medium mt-0.5">وضعیت اتصال، استعلام مشخصات عمومی کاربر و اعتبارسنجی توکن امنیتی</div>
+                </td>
+                <td className="py-3.5">
+                  <div className="flex flex-col gap-2.5 max-w-md">
+                    {/* Status badge and Refresh button */}
+                    <div className="flex items-center justify-between gap-2 bg-slate-50 border border-slate-100 rounded-xl p-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-slate-500 font-extrabold">وضعیت اتصال:</span>
+                        {h14mStatus?.connected ? (
+                          <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-850 border border-emerald-200 text-[10px] font-black px-2 py-0.5 rounded-lg" title="هسته سیستم عامل H14M با موفقیت متصل شده است">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            فعال (متصل)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-850 border border-amber-200 text-[10px] font-black px-2 py-0.5 rounded-lg" title="در انتظار اتصال یا استعلام از طرف هسته H14M">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                            در انتظار اتصال
+                          </span>
+                        )}
+                      </div>
+                      
+                      <button
+                        type="button"
+                        onClick={fetchH14mInfo}
+                        disabled={h14mLoading}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-black bg-indigo-50 hover:bg-indigo-100 disabled:bg-slate-100 text-indigo-700 disabled:text-slate-400 border border-indigo-200 rounded-lg cursor-pointer transition-all active:scale-95 select-none"
+                        title="به‌روزرسانی و استعلام مجدد از هسته سیستم عامل"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${h14mLoading ? 'animate-spin' : ''}`} />
+                        <span>استعلام از H14M</span>
+                      </button>
+                    </div>
+
+                    {/* H14M User Profile Details */}
+                    {h14mUserInfo ? (
+                      <div className="bg-indigo-50/45 border border-indigo-100/60 rounded-xl p-3 flex flex-col gap-1.5 text-[11px] text-indigo-950 font-bold">
+                        <div className="flex items-center justify-between border-b border-indigo-100/40 pb-1.5">
+                          <span className="flex items-center gap-1 text-indigo-800">
+                            <User className="w-3.5 h-3.5" />
+                            <span>کاربر متصل:</span>
+                          </span>
+                          <span className="font-mono text-xs text-indigo-900 bg-indigo-100/60 px-1.5 py-0.5 rounded">{h14mUserInfo.username}</span>
+                        </div>
+                        <div className="flex items-center justify-between border-b border-indigo-100/40 pb-1.5">
+                          <span className="flex items-center gap-1 text-indigo-800">
+                            <Terminal className="w-3.5 h-3.5" />
+                            <span>نقش سیستمی:</span>
+                          </span>
+                          <span className="text-[10px] text-indigo-900 bg-indigo-100/60 px-1.5 py-0.5 rounded">{h14mUserInfo.role === 'partner_developer' ? 'توسعه‌دهنده همکار' : h14mUserInfo.role}</span>
+                        </div>
+                        <div className="flex items-center justify-between border-b border-indigo-100/40 pb-1.5">
+                          <span className="flex items-center gap-1 text-indigo-800">
+                            <Link className="w-3.5 h-3.5" />
+                            <span>برنامه متصل:</span>
+                          </span>
+                          <span className="text-[10px] text-indigo-900">{h14mUserInfo.connected_app?.name}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] text-indigo-750">
+                          <span className="flex items-center gap-1">
+                            <Globe className="w-3.5 h-3.5" />
+                            <span>زمان هسته:</span>
+                          </span>
+                          <span className="font-mono">{new Date(h14mUserInfo.system_time).toLocaleTimeString('fa-IR')} {new Date(h14mUserInfo.system_time).toLocaleDateString('fa-IR')}</span>
+                        </div>
+                      </div>
+                    ) : h14mError ? (
+                      <div className="bg-rose-50/50 border border-rose-100 rounded-xl p-2 text-[10px] text-rose-700 font-extrabold flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                        <span>{h14mError}</span>
+                      </div>
+                    ) : (
+                      <div className="bg-slate-50/50 border border-slate-100 rounded-xl p-2.5 text-[10px] text-slate-400 font-bold text-center">
+                        هنوز اطلاعات کاربری از هسته بارگذاری نشده است. روی دکمه «استعلام از H14M» کلیک کنید.
+                      </div>
+                    )}
+                  </div>
+                </td>
+              </tr>
+
               {/* Client Version */}
               <tr>
                 <td className="py-3.5 pl-3">
@@ -755,80 +849,6 @@ export function BackupTab({
                   <div className="inline-flex items-center gap-1.5 bg-emerald-50 border border-emerald-200/65 rounded-lg px-2.5 py-1" title="کلاینت همگام با دیتاسنتر سرور">
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                     <span className="font-mono text-xs font-black text-emerald-950 tracking-tight leading-none">{clientVersion}</span>
-                  </div>
-                </td>
-              </tr>
-
-              {/* H14M OS Integration Status & Query */}
-              <tr>
-                <td className="py-3.5 pl-3">
-                  <div className="font-extrabold text-slate-800">اتصال به هسته سیستم‌عامل H14M (سند M14H)</div>
-                  <div className="text-[10px] text-slate-400 font-medium mt-0.5">
-                    بررسی اتصال آنلاین و استعلام مشخصات کاربر متصل شده به آموزشگاه
-                  </div>
-                  <div className="mt-1.5 flex gap-1.5 flex-wrap">
-                    <span className="px-1.5 py-0.5 bg-slate-100 text-slate-650 border border-slate-200 rounded font-mono text-[9px] font-bold">App ID: h14m-app-y415pvy0</span>
-                    <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-750 border border-indigo-100 rounded text-[9px] font-bold">آدرس وب‌هوک: /conect</span>
-                  </div>
-                </td>
-                <td className="py-3.5">
-                  <div className="flex flex-col gap-2.5">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <button
-                        type="button"
-                        onClick={fetchH14mUserInfo}
-                        disabled={h14mStatus === 'loading'}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-100 text-white disabled:text-slate-400 rounded-lg text-[10px] font-black transition-all cursor-pointer"
-                      >
-                        <RefreshCw className={`w-3 h-3 ${h14mStatus === 'loading' ? 'animate-spin' : ''}`} />
-                        <span>استعلام عمومی کاربر (get_user_info)</span>
-                      </button>
-
-                      {h14mStatus === 'success' && (
-                        <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg px-2 py-0.5 text-[10px] font-bold animate-fade-in">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600 animate-pulse" />
-                          <span>اتصال برقرار است</span>
-                        </span>
-                      )}
-                      
-                      {h14mStatus === 'error' && (
-                        <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-800 border border-rose-200 rounded-lg px-2 py-0.5 text-[10px] font-bold animate-fade-in">
-                          <AlertTriangle className="w-3 h-3 text-rose-600" />
-                          <span>خطا در استعلام</span>
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Display User Specs when successfully queried */}
-                    {h14mStatus === 'success' && h14mUserData && (
-                      <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-3 text-[11px] leading-relaxed text-slate-700 flex flex-col gap-2 max-w-md animate-fade-in">
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-                          <div>
-                            <span className="text-slate-400 font-bold text-[10px]">نام کاربری: </span>
-                            <span className="font-extrabold text-slate-800">{h14mUserData.username}</span>
-                          </div>
-                          <div>
-                            <span className="text-slate-400 font-bold text-[10px]">نقش کاربری: </span>
-                            <span className="font-extrabold text-slate-800">{h14mUserData.role === 'partner_developer' ? 'توسعه‌دهنده همکار' : h14mUserData.role}</span>
-                          </div>
-                          <div className="col-span-2">
-                            <span className="text-slate-400 font-bold text-[10px]">برنامه متصل: </span>
-                            <span className="font-extrabold text-slate-850">{h14mUserData.connected_app?.name || 'آموزشگاه'} </span>
-                            <span className="text-[10px] text-slate-500 font-mono">({h14mUserData.connected_app?.id})</span>
-                          </div>
-                          <div className="col-span-2 font-mono text-[9.5px] text-slate-500 border-t border-slate-200/50 pt-1 mt-1 flex justify-between">
-                            <span>زمان سیستم H14M:</span>
-                            <span className="font-bold">{h14mUserData.system_time ? new Date(h14mUserData.system_time).toLocaleString('fa-IR') : 'نامشخص'}</span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {h14mStatus === 'error' && h14mError && (
-                      <div className="text-[10px] text-rose-750 bg-rose-50/50 border border-rose-100 rounded-lg p-2 max-w-md font-medium animate-fade-in leading-relaxed">
-                        {h14mError}
-                      </div>
-                    )}
                   </div>
                 </td>
               </tr>

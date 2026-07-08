@@ -294,67 +294,64 @@ async function startServer() {
     res.json({ status: "ok", service: "coworking-manager" });
   });
 
-  // H14M OS Integration Webhook - Connect Endpoint
-  app.all(["/conect", "//conect"], (req, res) => {
-    const appId = req.headers["x-app-id"] || req.headers["X-App-Id"] || req.headers["x-app-id".toUpperCase()];
-    const secretToken = req.headers["x-secret-token"] || req.headers["X-Secret-Token"] || req.headers["x-secret-token".toUpperCase()];
+  // Memory variable for tracking the last connection probe from H14M
+  let lastH14MConnect: any = null;
 
-    console.log(`[H14M] Incoming connection check - Path: ${req.path}, Method: ${req.method}`);
-    console.log(`[H14M] Headers received - x-app-id: ${appId}, x-secret-token: ${secretToken ? "***" : "undefined"}`);
+  // Webhook for H14M core connection (M14H document)
+  app.all("/connect", (req, res) => {
+    const appId = req.headers["x-app-id"] || req.query["x-app-id"];
+    const secretToken = req.headers["x-secret-token"] || req.query["x-secret-token"];
 
-    const expectedAppId = "h14m-app-y415pvy0";
-    const expectedSecretToken = "h14m-sec-jqkas21ix38ly03vpfur";
+    console.log(`Received H14M connection probe. Method: ${req.method}, Headers:`, req.headers, "Body:", req.body);
 
-    if (appId !== expectedAppId || secretToken !== expectedSecretToken) {
-      console.warn(`[H14M] Authentication failed. Expected: ${expectedAppId}, Received: ${appId}`);
-      return res.status(401).json({
-        status: "error",
-        message: "Unauthorized: Invalid App ID or Secret Token credentials."
-      });
-    }
+    // Save connection state
+    lastH14MConnect = {
+      timestamp: Date.now(),
+      method: req.method,
+      headers: {
+        "x-app-id": appId,
+        "x-secret-token": secretToken ? `${secretToken.toString().slice(0, 8)}...` : undefined
+      },
+      body: req.body || null
+    };
 
-    res.status(200).json({
+    res.json({
       status: "success",
       version: "1.0.0",
-      description: "سامانه اتوماسیون و مدیریت آموزشگاه پرستو متصل به هسته سیستم‌عامل H14M"
+      description: "سامانه مدیریت فضای آموزشی پرستو متصل به هسته سیستم عامل H14M"
     });
   });
 
-  // Proxy endpoint to query user info from H14M OS
+  // H14M Integration Status
+  app.get("/api/h14m/status", (req, res) => {
+    res.json({
+      connected: lastH14MConnect !== null,
+      lastConnect: lastH14MConnect,
+      appId: "h14m-app-xtiuxnd2"
+    });
+  });
+
+  // H14M Proxy User Info query
   app.get("/api/h14m/user-info", async (req, res) => {
     try {
-      const h14mUrl = "https://ais-dev-hdapdvih77nadwi5biqbqu-408743671549.europe-west3.run.app/api/developer/get_user_info";
-      
-      console.log(`[H14M] Querying user info from H14M OS API: ${h14mUrl}`);
-      
-      const response = await fetch(h14mUrl, {
+      const targetUrl = "https://ais-dev-hdapdvih77nadwi5biqbqu-408743671549.europe-west3.run.app/api/developer/get_user_info";
+      const response = await fetch(targetUrl, {
         method: "GET",
         headers: {
-          "x-app-id": "h14m-app-y415pvy0",
-          "x-secret-token": "h14m-sec-jqkas21ix38ly03vpfur",
-          "Accept": "application/json"
+          "x-app-id": "h14m-app-xtiuxnd2",
+          "x-secret-token": "h14m-sec-v8f0phk86ghvcmo1ggj4"
         }
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`[H14M] API error response: ${response.status} - ${errorText}`);
-        return res.status(response.status).json({
-          success: false,
-          error: `H14M server returned error: ${response.status}`,
-          details: errorText
-        });
+        throw new Error(`H14M Core returned status ${response.status}`);
       }
 
       const data = await response.json();
-      console.log("[H14M] User info successfully fetched:", data);
       res.json(data);
     } catch (err: any) {
-      console.error("[H14M] Fetch exception:", err);
-      res.status(500).json({
-        success: false,
-        error: err.message || "Failed to contact H14M OS server"
-      });
+      console.error("Error querying H14M user info:", err);
+      res.status(500).json({ success: false, error: err.message });
     }
   });
 
