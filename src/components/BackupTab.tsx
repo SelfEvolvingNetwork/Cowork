@@ -132,7 +132,7 @@ export function BackupTab({
       window.parent.postMessage({
         source: "kalaf-node-client",
         action: "GET_CLIENT_IDENTITY",
-        nodeId: "h14m-app-xtiuxnd2"
+        nodeId: "kalaf-node-skd4vvm8"
       }, "https://h14m-parastu.runflare.run");
     } catch (e) {
       console.error("Failed to send postMessage to parent window:", e);
@@ -869,7 +869,7 @@ export function BackupTab({
                       )}
 
                       <div className="flex items-center justify-between text-[10px] text-slate-400 mt-1 border-t border-slate-50 pt-2">
-                        <span>شناسه اختصاصی نود: <b className="font-mono text-slate-600 select-all">h14m-app-xtiuxnd2</b></span>
+                        <span>شناسه اختصاصی نود: <b className="font-mono text-slate-600 select-all">kalaf-node-skd4vvm8</b></span>
                         <button
                           type="button"
                           onClick={triggerKalafHandshake}

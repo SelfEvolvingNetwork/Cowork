@@ -347,9 +347,9 @@ async function startServer() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-developer-token": "kalaf-dev-a9fhhzb63qsfkiulatkz",
-          "Authorization": "Bearer kalaf-dev-a9fhhzb63qsfkiulatkz",
-          "x-node-id": "h14m-app-xtiuxnd2"
+          "x-developer-token": "kalaf-dev-jn96r8jp1188nyxyf6ow",
+          "Authorization": "Bearer kalaf-dev-jn96r8jp1188nyxyf6ow",
+          "x-node-id": "kalaf-node-skd4vvm8"
         },
         body: JSON.stringify(syncData)
       });
