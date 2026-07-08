@@ -294,6 +294,70 @@ async function startServer() {
     res.json({ status: "ok", service: "coworking-manager" });
   });
 
+  // H14M OS Integration Webhook - Connect Endpoint
+  app.all(["/conect", "//conect"], (req, res) => {
+    const appId = req.headers["x-app-id"] || req.headers["X-App-Id"] || req.headers["x-app-id".toUpperCase()];
+    const secretToken = req.headers["x-secret-token"] || req.headers["X-Secret-Token"] || req.headers["x-secret-token".toUpperCase()];
+
+    console.log(`[H14M] Incoming connection check - Path: ${req.path}, Method: ${req.method}`);
+    console.log(`[H14M] Headers received - x-app-id: ${appId}, x-secret-token: ${secretToken ? "***" : "undefined"}`);
+
+    const expectedAppId = "h14m-app-y415pvy0";
+    const expectedSecretToken = "h14m-sec-jqkas21ix38ly03vpfur";
+
+    if (appId !== expectedAppId || secretToken !== expectedSecretToken) {
+      console.warn(`[H14M] Authentication failed. Expected: ${expectedAppId}, Received: ${appId}`);
+      return res.status(401).json({
+        status: "error",
+        message: "Unauthorized: Invalid App ID or Secret Token credentials."
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      version: "1.0.0",
+      description: "سامانه اتوماسیون و مدیریت آموزشگاه پرستو متصل به هسته سیستم‌عامل H14M"
+    });
+  });
+
+  // Proxy endpoint to query user info from H14M OS
+  app.get("/api/h14m/user-info", async (req, res) => {
+    try {
+      const h14mUrl = "https://ais-dev-hdapdvih77nadwi5biqbqu-408743671549.europe-west3.run.app/api/developer/get_user_info";
+      
+      console.log(`[H14M] Querying user info from H14M OS API: ${h14mUrl}`);
+      
+      const response = await fetch(h14mUrl, {
+        method: "GET",
+        headers: {
+          "x-app-id": "h14m-app-y415pvy0",
+          "x-secret-token": "h14m-sec-jqkas21ix38ly03vpfur",
+          "Accept": "application/json"
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[H14M] API error response: ${response.status} - ${errorText}`);
+        return res.status(response.status).json({
+          success: false,
+          error: `H14M server returned error: ${response.status}`,
+          details: errorText
+        });
+      }
+
+      const data = await response.json();
+      console.log("[H14M] User info successfully fetched:", data);
+      res.json(data);
+    } catch (err: any) {
+      console.error("[H14M] Fetch exception:", err);
+      res.status(500).json({
+        success: false,
+        error: err.message || "Failed to contact H14M OS server"
+      });
+    }
+  });
+
   // Version check API route
   app.get("/api/version", (req, res) => {
     res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
