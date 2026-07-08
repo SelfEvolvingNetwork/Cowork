@@ -5,6 +5,16 @@ export interface CoworkingConfig {
   academyPhone?: string;
   academyAddress?: string;
   academyLogo?: string;
+  // Kalaf Specific Configuration
+  kalafVersion?: string;
+  kalafIconEmoji?: string;
+  kalafDescription?: string;
+  kalafContactEmail?: string;
+  kalafContactTelegram?: string;
+  kalafUpdates?: string;
+  lastKalafSyncTime?: string;
+  lastKalafSyncStatus?: string;
+  lastKalafSyncMessage?: string;
 }
 
 export interface Shift {

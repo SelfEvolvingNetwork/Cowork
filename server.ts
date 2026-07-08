@@ -65,6 +65,16 @@ interface DbState {
     academyPhone?: string;
     academyAddress?: string;
     academyLogo?: string;
+    // Kalaf platform fields
+    kalafVersion?: string;
+    kalafIconEmoji?: string;
+    kalafDescription?: string;
+    kalafContactEmail?: string;
+    kalafContactTelegram?: string;
+    kalafUpdates?: string;
+    lastKalafSyncTime?: string;
+    lastKalafSyncStatus?: string;
+    lastKalafSyncMessage?: string;
   };
   shifts: any[];
   members: any[];
@@ -126,6 +136,17 @@ function migrateAndNormalizeState(input: any): DbState {
     academyPhone: typeof config.academyPhone === "string" ? config.academyPhone : "",
     academyAddress: typeof config.academyAddress === "string" ? config.academyAddress : "",
     academyLogo: typeof config.academyLogo === "string" ? config.academyLogo : "",
+    
+    // Kalaf platform settings
+    kalafVersion: typeof config.kalafVersion === "string" ? config.kalafVersion : "1.0.0-stable",
+    kalafIconEmoji: typeof config.kalafIconEmoji === "string" ? config.kalafIconEmoji : "⚙️",
+    kalafDescription: typeof config.kalafDescription === "string" ? config.kalafDescription : "سامانه مدیریت آموزشگاه پرستو متصل به کلاف",
+    kalafContactEmail: typeof config.kalafContactEmail === "string" ? config.kalafContactEmail : "Rulingcode@gmail.com",
+    kalafContactTelegram: typeof config.kalafContactTelegram === "string" ? config.kalafContactTelegram : "@parastu_support",
+    kalafUpdates: typeof config.kalafUpdates === "string" ? config.kalafUpdates : "راه‌اندازی نسخه اولیه کلاف",
+    lastKalafSyncTime: typeof config.lastKalafSyncTime === "string" ? config.lastKalafSyncTime : "",
+    lastKalafSyncStatus: typeof config.lastKalafSyncStatus === "string" ? config.lastKalafSyncStatus : "",
+    lastKalafSyncMessage: typeof config.lastKalafSyncMessage === "string" ? config.lastKalafSyncMessage : ""
   };
 
   // Standardize shifts mapping any legacy key/values
@@ -213,7 +234,16 @@ const DEFAULT_DB: DbState = {
     academyName: "آموزشگاه پرستو",
     academyPhone: "",
     academyAddress: "",
-    academyLogo: ""
+    academyLogo: "",
+    kalafVersion: "1.0.0-stable",
+    kalafIconEmoji: "⚙️",
+    kalafDescription: "سامانه مدیریت آموزشگاه پرستو متصل به کلاف",
+    kalafContactEmail: "Rulingcode@gmail.com",
+    kalafContactTelegram: "@parastu_support",
+    kalafUpdates: "راه‌اندازی نسخه اولیه کلاف",
+    lastKalafSyncTime: "",
+    lastKalafSyncStatus: "",
+    lastKalafSyncMessage: ""
   },
   shifts: [],
   members: [],
@@ -294,63 +324,71 @@ async function startServer() {
     res.json({ status: "ok", service: "coworking-manager" });
   });
 
-  // Memory variable for tracking the last connection probe from H14M
-  let lastH14MConnect: any = null;
-
-  // Webhook for H14M core connection (M14H document)
-  app.all("/connect", (req, res) => {
-    const appId = req.headers["x-app-id"] || req.query["x-app-id"];
-    const secretToken = req.headers["x-secret-token"] || req.query["x-secret-token"];
-
-    console.log(`Received H14M connection probe. Method: ${req.method}, Headers:`, req.headers, "Body:", req.body);
-
-    // Save connection state
-    lastH14MConnect = {
-      timestamp: Date.now(),
-      method: req.method,
-      headers: {
-        "x-app-id": appId,
-        "x-secret-token": secretToken ? `${secretToken.toString().slice(0, 8)}...` : undefined
-      },
-      body: req.body || null
-    };
-
-    res.json({
-      status: "success",
-      version: "1.0.0",
-      description: "سامانه مدیریت فضای آموزشی پرستو متصل به هسته سیستم عامل H14M"
-    });
-  });
-
-  // H14M Integration Status
-  app.get("/api/h14m/status", (req, res) => {
-    res.json({
-      connected: lastH14MConnect !== null,
-      lastConnect: lastH14MConnect,
-      appId: "h14m-app-xtiuxnd2"
-    });
-  });
-
-  // H14M Proxy User Info query
-  app.get("/api/h14m/user-info", async (req, res) => {
+  // Kalaf Platform Online Synchronization Proxy Endpoint
+  app.post("/api/kalaf/sync", async (req, res) => {
     try {
-      const targetUrl = "https://ais-dev-hdapdvih77nadwi5biqbqu-408743671549.europe-west3.run.app/api/developer/get_user_info";
-      const response = await fetch(targetUrl, {
-        method: "GET",
+      const db = await readDb();
+      
+      const syncData = {
+        name: req.body.name || db.config.academyName || "آموزشگاه",
+        version: req.body.version || db.config.kalafVersion || "1.0.0-stable",
+        iconEmoji: req.body.iconEmoji || db.config.kalafIconEmoji || "⚙️",
+        description: req.body.description || db.config.kalafDescription || "سامانه مدیریت آموزشگاه پرستو متصل به کلاف",
+        contact_info: {
+          email: req.body.contact_email || db.config.kalafContactEmail || "Rulingcode@gmail.com",
+          telegram: req.body.contact_telegram || db.config.kalafContactTelegram || "@parastu_support"
+        },
+        updates: req.body.updates || db.config.kalafUpdates || "تغییرات آخرین نسخه..."
+      };
+
+      console.log("Pushing specifications to Kalaf server:", syncData);
+
+      const response = await fetch("https://h14m-parastu.runflare.run/api/v1/node/sync", {
+        method: "POST",
         headers: {
-          "x-app-id": "h14m-app-xtiuxnd2",
-          "x-secret-token": "h14m-sec-v8f0phk86ghvcmo1ggj4"
-        }
+          "Content-Type": "application/json",
+          "x-developer-token": "kalaf-dev-a9fhhzb63qsfkiulatkz",
+          "Authorization": "Bearer kalaf-dev-a9fhhzb63qsfkiulatkz",
+          "x-node-id": "h14m-app-xtiuxnd2"
+        },
+        body: JSON.stringify(syncData)
       });
 
-      if (!response.ok) {
-        throw new Error(`H14M Core returned status ${response.status}`);
+      const responseText = await response.text();
+      let responseData: any = {};
+      try {
+        responseData = JSON.parse(responseText);
+      } catch (err) {
+        responseData = { message: responseText };
       }
 
-      const data = await response.json();
-      res.json(data);
+      const syncStatus = response.ok ? "success" : "error";
+      const syncMsg = responseData?.message || responseData?.error || `Status: ${response.status}`;
+      const syncTime = new Date().toLocaleString("fa-IR");
+
+      // Save sync status in DB config
+      db.config.lastKalafSyncTime = syncTime;
+      db.config.lastKalafSyncStatus = syncStatus;
+      db.config.lastKalafSyncMessage = syncMsg;
+      
+      // Update stored configuration values if sync was successful
+      if (req.body.name) db.config.academyName = req.body.name;
+      if (req.body.version) db.config.kalafVersion = req.body.version;
+      if (req.body.iconEmoji) db.config.kalafIconEmoji = req.body.iconEmoji;
+      if (req.body.description) db.config.kalafDescription = req.body.description;
+      if (req.body.contact_email) db.config.kalafContactEmail = req.body.contact_email;
+      if (req.body.contact_telegram) db.config.kalafContactTelegram = req.body.contact_telegram;
+      if (req.body.updates) db.config.kalafUpdates = req.body.updates;
+
+      await writeDb(db);
+
+      res.json({
+        success: response.ok,
+        data: responseData,
+        db
+      });
     } catch (err: any) {
-      console.error("Error querying H14M user info:", err);
+      console.error("Error invoking Kalaf sync proxy:", err);
       res.status(500).json({ success: false, error: err.message });
     }
   });

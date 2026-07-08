@@ -102,57 +102,12 @@ export function BackupTab({
     }
   };
 
-  // H14M OS Core integration states (M14H Document)
-  const [h14mStatus, setH14mStatus] = useState<{
-    connected: boolean;
-    lastConnect: { timestamp: number; method: string; headers: any; body: any } | null;
-    appId: string;
-  } | null>(null);
-  const [h14mUserInfo, setH14mUserInfo] = useState<any>(null);
-  const [h14mLoading, setH14mLoading] = useState<boolean>(false);
-  const [h14mError, setH14mError] = useState<string | null>(null);
-
-  const fetchH14mInfo = async () => {
-    setH14mLoading(true);
-    setH14mError(null);
-    try {
-      // 1. Fetch local connection state tracking
-      const statusRes = await fetch("/api/h14m/status");
-      if (statusRes.ok) {
-        const statusData = await statusRes.json();
-        setH14mStatus(statusData);
-      }
-
-      // 2. Fetch user details via proxy to H14M OS Core (secures secret token)
-      const userInfoRes = await fetch("/api/h14m/user-info");
-      if (userInfoRes.ok) {
-        const userInfoData = await userInfoRes.json();
-        if (userInfoData.success) {
-          setH14mUserInfo(userInfoData.user);
-        } else {
-          setH14mError(userInfoData.error || "خطا در دریافت اطلاعات کاربر");
-        }
-      } else {
-        setH14mError(`خطای ارتباط با سرور: ${userInfoRes.status}`);
-      }
-    } catch (err: any) {
-      setH14mError(err.message || "خطا در ارتباط با سرور");
-    } finally {
-      setH14mLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    checkSecureFolderStatus();
-    fetchH14mInfo();
-  }, []);
-
-  // File import input ref
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Wiping confirmation states
-  const [showWipeConfirm, setShowWipeConfirm] = useState<boolean>(false);
-  const [wipeConfirmText, setWipeConfirmText] = useState<string>('');
+  // Kalaf platform integration states
+  const [kalafUserId, setKalafUserId] = useState<string | null>(null);
+  const [kalafHandshakeError, setKalafHandshakeError] = useState<string | null>(null);
+  const [kalafSyncing, setKalafSyncing] = useState<boolean>(false);
+  const [kalafSyncError, setKalafSyncError] = useState<string | null>(null);
+  const [kalafSyncResult, setKalafSyncResult] = useState<any>(null);
 
   // Settings local states
   const [regularDesks, setRegularDesks] = useState<number>(config.totalRegularDesks || 20);
@@ -161,6 +116,114 @@ export function BackupTab({
   const [academyPhone, setAcademyPhone] = useState<string>(config.academyPhone || '');
   const [academyAddress, setAcademyAddress] = useState<string>(config.academyAddress || '');
   const [academyLogo, setAcademyLogo] = useState<string>(config.academyLogo || '');
+
+  // Kalaf Specific local states
+  const [kalafVersion, setKalafVersion] = useState<string>(config.kalafVersion || "1.0.0-stable");
+  const [kalafIconEmoji, setKalafIconEmoji] = useState<string>(config.kalafIconEmoji || "⚙️");
+  const [kalafDescription, setKalafDescription] = useState<string>(config.kalafDescription || "سامانه مدیریت آموزشگاه پرستو متصل به کلاف");
+  const [kalafContactEmail, setKalafContactEmail] = useState<string>(config.kalafContactEmail || "Rulingcode@gmail.com");
+  const [kalafContactTelegram, setKalafContactTelegram] = useState<string>(config.kalafContactTelegram || "@parastu_support");
+  const [kalafUpdates, setKalafUpdates] = useState<string>(config.kalafUpdates || "راه‌اندازی نسخه اولیه کلاف");
+
+  // PostMessage handshake with parent window (Kalaf)
+  const triggerKalafHandshake = () => {
+    try {
+      console.log("Sending GET_CLIENT_IDENTITY postMessage handshake to Kalaf...");
+      window.parent.postMessage({
+        source: "kalaf-node-client",
+        action: "GET_CLIENT_IDENTITY",
+        nodeId: "h14m-app-xtiuxnd2"
+      }, "https://h14m-parastu.runflare.run");
+    } catch (e) {
+      console.error("Failed to send postMessage to parent window:", e);
+    }
+  };
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Ensure messages originate from safe Kalaf domain
+      if (event.origin !== "https://h14m-parastu.runflare.run") return;
+
+      if (event.data && event.data.source === "kalaf-os") {
+        const { action, success, userId, error } = event.data;
+        if (action === "CLIENT_IDENTITY_RESPONSE") {
+          if (success) {
+            console.log("شناسه کاربر کلاف دریافت شد:", userId);
+            setKalafUserId(userId);
+            setKalafHandshakeError(null);
+          } else {
+            console.error("خطای احراز هویت امنیتی:", error);
+            setKalafHandshakeError(error || "خطای نامشخص احراز هویت");
+          }
+        }
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    
+    // Automatically trigger handshake on mount
+    triggerKalafHandshake();
+
+    // Trigger periodically in case window loads slowly
+    const interval = setInterval(triggerKalafHandshake, 3500);
+
+    return () => {
+      window.removeEventListener("message", handleMessage);
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Sync Specifications with Kalaf Proxy Endpoint
+  const triggerKalafSync = async () => {
+    setKalafSyncing(true);
+    setKalafSyncError(null);
+    try {
+      const res = await fetch("/api/kalaf/sync", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          name: academyName.trim(),
+          version: kalafVersion.trim(),
+          iconEmoji: kalafIconEmoji.trim(),
+          description: kalafDescription.trim(),
+          contact_email: kalafContactEmail.trim(),
+          contact_telegram: kalafContactTelegram.trim(),
+          updates: kalafUpdates.trim()
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || `خطای سرور: ${res.status}`);
+      }
+
+      setKalafSyncResult(data.data);
+      showToast('success', 'مشخصات نود با موفقیت به پلتفرم آنلاین کلاف ارسال و همگام‌سازی شد.');
+      
+      if (data.db?.config) {
+        updateConfig(data.db.config);
+      }
+    } catch (err: any) {
+      console.error("Kalaf sync failed:", err);
+      setKalafSyncError(err.message || "خطا در ارتباط با سرور");
+      showToast('error', 'خطا در همگام‌سازی با کلاف: ' + (err.message || ""));
+    } finally {
+      setKalafSyncing(false);
+    }
+  };
+
+  useEffect(() => {
+    checkSecureFolderStatus();
+  }, []);
+
+  // File import input ref
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Wiping confirmation states
+  const [showWipeConfirm, setShowWipeConfirm] = useState<boolean>(false);
+  const [wipeConfirmText, setWipeConfirmText] = useState<string>('');
 
   // Synchronize local setting states when props change
   useEffect(() => {
@@ -171,6 +234,13 @@ export function BackupTab({
       setAcademyPhone(config.academyPhone || '');
       setAcademyAddress(config.academyAddress || '');
       setAcademyLogo(config.academyLogo || '');
+
+      setKalafVersion(config.kalafVersion || "1.0.0-stable");
+      setKalafIconEmoji(config.kalafIconEmoji || "⚙️");
+      setKalafDescription(config.kalafDescription || "سامانه مدیریت آموزشگاه پرستو متصل به کلاف");
+      setKalafContactEmail(config.kalafContactEmail || "Rulingcode@gmail.com");
+      setKalafContactTelegram(config.kalafContactTelegram || "@parastu_support");
+      setKalafUpdates(config.kalafUpdates || "راه‌اندازی نسخه اولیه کلاف");
     }
   }, [config]);
 
@@ -328,7 +398,14 @@ export function BackupTab({
       academyName: academyName.trim(),
       academyPhone: academyPhone.trim(),
       academyAddress: academyAddress.trim(),
-      academyLogo: academyLogo
+      academyLogo: academyLogo,
+
+      kalafVersion: kalafVersion.trim(),
+      kalafIconEmoji: kalafIconEmoji.trim(),
+      kalafDescription: kalafDescription.trim(),
+      kalafContactEmail: kalafContactEmail.trim(),
+      kalafContactTelegram: kalafContactTelegram.trim(),
+      kalafUpdates: kalafUpdates.trim()
     });
     showToast('success', 'تنظیمات سیستم با موفقیت به‌روزرسانی و در سرور ذخیره شد.');
   };
@@ -753,88 +830,164 @@ export function BackupTab({
                 </td>
               </tr>
 
-              {/* H14M OS Integration */}
+              {/* Kalaf Platform Integration */}
               <tr>
-                <td className="py-3.5 pl-3">
+                <td className="py-4 pl-3">
                   <div className="flex items-center gap-1.5 font-extrabold text-slate-800">
                     <Cpu className="w-4 h-4 text-indigo-600" />
-                    <span>اتصال به هسته سیستم عامل H14M (سند M14H)</span>
+                    <span>اتصال به پلتفرم کلاف (نسخه نهایی)</span>
                   </div>
-                  <div className="text-[10px] text-slate-400 font-medium mt-0.5">وضعیت اتصال، استعلام مشخصات عمومی کاربر و اعتبارسنجی توکن امنیتی</div>
+                  <div className="text-[10px] text-slate-400 font-medium mt-0.5">همگام‌سازی مشخصات نود و هندشیک دریافت شناسه کاربر در بستر IFrame</div>
                 </td>
-                <td className="py-3.5">
-                  <div className="flex flex-col gap-2.5 max-w-md">
-                    {/* Status badge and Refresh button */}
-                    <div className="flex items-center justify-between gap-2 bg-slate-50 border border-slate-100 rounded-xl p-2">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-slate-500 font-extrabold">وضعیت اتصال:</span>
-                        {h14mStatus?.connected ? (
-                          <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-850 border border-emerald-200 text-[10px] font-black px-2 py-0.5 rounded-lg" title="هسته سیستم عامل H14M با موفقیت متصل شده است">
+                <td className="py-4">
+                  <div className="flex flex-col gap-4 max-w-md bg-slate-50/50 border border-slate-200/60 rounded-xl p-4">
+                    
+                    {/* Identity Status Card */}
+                    <div className="flex flex-col gap-2 bg-white border border-slate-100 rounded-lg p-3">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-500 font-extrabold flex items-center gap-1">
+                          <User className="w-3.5 h-3.5 text-indigo-600" />
+                          <span>هویت کاربر کلاف:</span>
+                        </span>
+                        {kalafUserId ? (
+                          <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-black px-2 py-0.5 rounded-md">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                            فعال (متصل)
+                            {kalafUserId}
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-850 border border-amber-200 text-[10px] font-black px-2 py-0.5 rounded-lg" title="در انتظار اتصال یا استعلام از طرف هسته H14M">
+                          <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-black px-2 py-0.5 rounded-md">
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-                            در انتظار اتصال
+                            در انتظار هندشیک
                           </span>
                         )}
                       </div>
-                      
-                      <button
-                        type="button"
-                        onClick={fetchH14mInfo}
-                        disabled={h14mLoading}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-black bg-indigo-50 hover:bg-indigo-100 disabled:bg-slate-100 text-indigo-700 disabled:text-slate-400 border border-indigo-200 rounded-lg cursor-pointer transition-all active:scale-95 select-none"
-                        title="به‌روزرسانی و استعلام مجدد از هسته سیستم عامل"
-                      >
-                        <RefreshCw className={`w-3 h-3 ${h14mLoading ? 'animate-spin' : ''}`} />
-                        <span>استعلام از H14M</span>
-                      </button>
+
+                      {kalafHandshakeError && (
+                        <div className="text-[9px] text-rose-600 font-bold bg-rose-50 border border-rose-100 rounded p-1.5">
+                          خطای هندشیک: {kalafHandshakeError}
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between text-[10px] text-slate-400 mt-1 border-t border-slate-50 pt-2">
+                        <span>شناسه اختصاصی نود: <b className="font-mono text-slate-600 select-all">h14m-app-xtiuxnd2</b></span>
+                        <button
+                          type="button"
+                          onClick={triggerKalafHandshake}
+                          className="text-[9px] font-black text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
+                          title="ارسال مجدد سیگنال postMessage برای دریافت شناسه کاربر کلاف"
+                        >
+                          تلاش مجدد هندشیک
+                        </button>
+                      </div>
                     </div>
 
-                    {/* H14M User Profile Details */}
-                    {h14mUserInfo ? (
-                      <div className="bg-indigo-50/45 border border-indigo-100/60 rounded-xl p-3 flex flex-col gap-1.5 text-[11px] text-indigo-950 font-bold">
-                        <div className="flex items-center justify-between border-b border-indigo-100/40 pb-1.5">
-                          <span className="flex items-center gap-1 text-indigo-800">
-                            <User className="w-3.5 h-3.5" />
-                            <span>کاربر متصل:</span>
-                          </span>
-                          <span className="font-mono text-xs text-indigo-900 bg-indigo-100/60 px-1.5 py-0.5 rounded">{h14mUserInfo.username}</span>
+                    {/* Sync Fields */}
+                    <div className="grid grid-cols-1 gap-3.5 border-t border-slate-100 pt-3">
+                      <div>
+                        <label className="text-[10.5px] font-extrabold text-slate-700 block mb-1">نسخه انتشار نود کلاف (version)</label>
+                        <input
+                          type="text"
+                          value={kalafVersion}
+                          onChange={(e) => setKalafVersion(e.target.value)}
+                          placeholder="مثال: 1.0.0-stable"
+                          className="w-full h-8 px-2.5 bg-white border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-indigo-500 transition-all font-mono text-left"
+                          dir="ltr"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10.5px] font-extrabold text-slate-700 block mb-1">ایموجی آیکون کلاف (iconEmoji)</label>
+                        <input
+                          type="text"
+                          value={kalafIconEmoji}
+                          onChange={(e) => setKalafIconEmoji(e.target.value)}
+                          placeholder="مثال: ⚙️ یا 🏫"
+                          className="w-full h-8 px-2.5 bg-white border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-indigo-500 transition-all text-center"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10.5px] font-extrabold text-slate-700 block mb-1">توضیحات نود در کلاف (description)</label>
+                        <textarea
+                          rows={2}
+                          value={kalafDescription}
+                          onChange={(e) => setKalafDescription(e.target.value)}
+                          placeholder="توضیحات مربوط به نود برای نمایش کاربران در پلتفرم کلاف..."
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-indigo-500 transition-all resize-none leading-relaxed"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[10.5px] font-extrabold text-slate-700 block mb-1">ایمیل تماس</label>
+                          <input
+                            type="text"
+                            value={kalafContactEmail}
+                            onChange={(e) => setKalafContactEmail(e.target.value)}
+                            className="w-full h-8 px-2.5 bg-white border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-indigo-500 transition-all font-mono text-left"
+                            dir="ltr"
+                          />
                         </div>
-                        <div className="flex items-center justify-between border-b border-indigo-100/40 pb-1.5">
-                          <span className="flex items-center gap-1 text-indigo-800">
-                            <Terminal className="w-3.5 h-3.5" />
-                            <span>نقش سیستمی:</span>
-                          </span>
-                          <span className="text-[10px] text-indigo-900 bg-indigo-100/60 px-1.5 py-0.5 rounded">{h14mUserInfo.role === 'partner_developer' ? 'توسعه‌دهنده همکار' : h14mUserInfo.role}</span>
-                        </div>
-                        <div className="flex items-center justify-between border-b border-indigo-100/40 pb-1.5">
-                          <span className="flex items-center gap-1 text-indigo-800">
-                            <Link className="w-3.5 h-3.5" />
-                            <span>برنامه متصل:</span>
-                          </span>
-                          <span className="text-[10px] text-indigo-900">{h14mUserInfo.connected_app?.name}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-[10px] text-indigo-750">
-                          <span className="flex items-center gap-1">
-                            <Globe className="w-3.5 h-3.5" />
-                            <span>زمان هسته:</span>
-                          </span>
-                          <span className="font-mono">{new Date(h14mUserInfo.system_time).toLocaleTimeString('fa-IR')} {new Date(h14mUserInfo.system_time).toLocaleDateString('fa-IR')}</span>
+                        <div>
+                          <label className="text-[10.5px] font-extrabold text-slate-700 block mb-1">آی‌دی تلگرام</label>
+                          <input
+                            type="text"
+                            value={kalafContactTelegram}
+                            onChange={(e) => setKalafContactTelegram(e.target.value)}
+                            className="w-full h-8 px-2.5 bg-white border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-indigo-500 transition-all font-mono text-left"
+                            dir="ltr"
+                          />
                         </div>
                       </div>
-                    ) : h14mError ? (
-                      <div className="bg-rose-50/50 border border-rose-100 rounded-xl p-2 text-[10px] text-rose-700 font-extrabold flex items-center gap-1.5">
-                        <AlertTriangle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                        <span>{h14mError}</span>
+
+                      <div>
+                        <label className="text-[10.5px] font-extrabold text-slate-700 block mb-1">تغییرات آخرین نسخه (updates)</label>
+                        <textarea
+                          rows={2}
+                          value={kalafUpdates}
+                          onChange={(e) => setKalafUpdates(e.target.value)}
+                          placeholder="گزارش تغییرات برای ثبت در کلاف..."
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-indigo-500 transition-all resize-none leading-relaxed"
+                        />
                       </div>
-                    ) : (
-                      <div className="bg-slate-50/50 border border-slate-100 rounded-xl p-2.5 text-[10px] text-slate-400 font-bold text-center">
-                        هنوز اطلاعات کاربری از هسته بارگذاری نشده است. روی دکمه «استعلام از H14M» کلیک کنید.
+                    </div>
+
+                    {/* Action sync button */}
+                    <div className="border-t border-slate-100 pt-3 flex flex-col gap-2">
+                      <button
+                        type="button"
+                        onClick={triggerKalafSync}
+                        disabled={kalafSyncing}
+                        className="w-full h-9 flex items-center justify-center gap-1.5 text-xs font-black bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 text-white disabled:text-slate-400 rounded-lg cursor-pointer transition-all active:scale-[0.98] select-none shadow-sm"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${kalafSyncing ? 'animate-spin' : ''}`} />
+                        <span>همگام‌سازی مشخصات با کلاف</span>
+                      </button>
+
+                      {/* Display last sync results */}
+                      <div className="text-[10px] text-slate-500 mt-1 flex flex-col gap-1 font-bold">
+                        <div className="flex items-center justify-between">
+                          <span>آخرین همگام‌سازی:</span>
+                          <span className="font-mono">{config.lastKalafSyncTime || 'تاکنون انجام نشده'}</span>
+                        </div>
+                        {config.lastKalafSyncStatus && (
+                          <div className="flex items-center justify-between">
+                            <span>وضعیت پاسخ کلاف:</span>
+                            {config.lastKalafSyncStatus === 'success' ? (
+                              <span className="text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 text-[9px] font-black">موفقیت‌آمیز</span>
+                            ) : (
+                              <span className="text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-100 text-[9px] font-black">خطا</span>
+                            )}
+                          </div>
+                        )}
+                        {config.lastKalafSyncMessage && (
+                          <div className="bg-slate-100/50 border border-slate-200/50 rounded p-1.5 text-[9px] leading-relaxed font-mono font-medium text-slate-600 mt-0.5 text-left break-all max-h-16 overflow-y-auto" dir="ltr">
+                            {config.lastKalafSyncMessage}
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
+
                   </div>
                 </td>
               </tr>
