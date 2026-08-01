@@ -65,16 +65,6 @@ interface DbState {
     academyPhone?: string;
     academyAddress?: string;
     academyLogo?: string;
-    // Kalaf platform fields
-    kalafVersion?: string;
-    kalafIconEmoji?: string;
-    kalafDescription?: string;
-    kalafContactEmail?: string;
-    kalafContactTelegram?: string;
-    kalafUpdates?: string;
-    lastKalafSyncTime?: string;
-    lastKalafSyncStatus?: string;
-    lastKalafSyncMessage?: string;
   };
   shifts: any[];
   members: any[];
@@ -136,17 +126,6 @@ function migrateAndNormalizeState(input: any): DbState {
     academyPhone: typeof config.academyPhone === "string" ? config.academyPhone : "",
     academyAddress: typeof config.academyAddress === "string" ? config.academyAddress : "",
     academyLogo: typeof config.academyLogo === "string" ? config.academyLogo : "",
-    
-    // Kalaf platform settings
-    kalafVersion: typeof config.kalafVersion === "string" ? config.kalafVersion : "1.0.0-stable",
-    kalafIconEmoji: typeof config.kalafIconEmoji === "string" ? config.kalafIconEmoji : "⚙️",
-    kalafDescription: typeof config.kalafDescription === "string" ? config.kalafDescription : "سامانه مدیریت آموزشگاه پرستو متصل به کلاف",
-    kalafContactEmail: typeof config.kalafContactEmail === "string" ? config.kalafContactEmail : "Rulingcode@gmail.com",
-    kalafContactTelegram: typeof config.kalafContactTelegram === "string" ? config.kalafContactTelegram : "@parastu_support",
-    kalafUpdates: typeof config.kalafUpdates === "string" ? config.kalafUpdates : "راه‌اندازی نسخه اولیه کلاف",
-    lastKalafSyncTime: typeof config.lastKalafSyncTime === "string" ? config.lastKalafSyncTime : "",
-    lastKalafSyncStatus: typeof config.lastKalafSyncStatus === "string" ? config.lastKalafSyncStatus : "",
-    lastKalafSyncMessage: typeof config.lastKalafSyncMessage === "string" ? config.lastKalafSyncMessage : ""
   };
 
   // Standardize shifts mapping any legacy key/values
@@ -234,16 +213,7 @@ const DEFAULT_DB: DbState = {
     academyName: "آموزشگاه پرستو",
     academyPhone: "",
     academyAddress: "",
-    academyLogo: "",
-    kalafVersion: "1.0.0-stable",
-    kalafIconEmoji: "⚙️",
-    kalafDescription: "سامانه مدیریت آموزشگاه پرستو متصل به کلاف",
-    kalafContactEmail: "Rulingcode@gmail.com",
-    kalafContactTelegram: "@parastu_support",
-    kalafUpdates: "راه‌اندازی نسخه اولیه کلاف",
-    lastKalafSyncTime: "",
-    lastKalafSyncStatus: "",
-    lastKalafSyncMessage: ""
+    academyLogo: ""
   },
   shifts: [],
   members: [],
@@ -322,75 +292,6 @@ async function startServer() {
   // Health check API route
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", service: "coworking-manager" });
-  });
-
-  // Kalaf Platform Online Synchronization Proxy Endpoint
-  app.post("/api/kalaf/sync", async (req, res) => {
-    try {
-      const db = await readDb();
-      
-      const syncData = {
-        name: req.body.name || db.config.academyName || "آموزشگاه",
-        version: req.body.version || db.config.kalafVersion || "1.0.0-stable",
-        iconEmoji: req.body.iconEmoji || db.config.kalafIconEmoji || "⚙️",
-        description: req.body.description || db.config.kalafDescription || "سامانه مدیریت آموزشگاه پرستو متصل به کلاف",
-        contact_info: {
-          email: req.body.contact_email || db.config.kalafContactEmail || "Rulingcode@gmail.com",
-          telegram: req.body.contact_telegram || db.config.kalafContactTelegram || "@parastu_support"
-        },
-        updates: req.body.updates || db.config.kalafUpdates || "تغییرات آخرین نسخه..."
-      };
-
-      console.log("Pushing specifications to Kalaf server:", syncData);
-
-      const response = await fetch("https://h14m-parastu.runflare.run/api/v1/node/sync", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-developer-token": "kalaf-dev-jn96r8jp1188nyxyf6ow",
-          "Authorization": "Bearer kalaf-dev-jn96r8jp1188nyxyf6ow",
-          "x-node-id": "kalaf-node-skd4vvm8"
-        },
-        body: JSON.stringify(syncData)
-      });
-
-      const responseText = await response.text();
-      let responseData: any = {};
-      try {
-        responseData = JSON.parse(responseText);
-      } catch (err) {
-        responseData = { message: responseText };
-      }
-
-      const syncStatus = response.ok ? "success" : "error";
-      const syncMsg = responseData?.message || responseData?.error || `Status: ${response.status}`;
-      const syncTime = new Date().toLocaleString("fa-IR");
-
-      // Save sync status in DB config
-      db.config.lastKalafSyncTime = syncTime;
-      db.config.lastKalafSyncStatus = syncStatus;
-      db.config.lastKalafSyncMessage = syncMsg;
-      
-      // Update stored configuration values if sync was successful
-      if (req.body.name) db.config.academyName = req.body.name;
-      if (req.body.version) db.config.kalafVersion = req.body.version;
-      if (req.body.iconEmoji) db.config.kalafIconEmoji = req.body.iconEmoji;
-      if (req.body.description) db.config.kalafDescription = req.body.description;
-      if (req.body.contact_email) db.config.kalafContactEmail = req.body.contact_email;
-      if (req.body.contact_telegram) db.config.kalafContactTelegram = req.body.contact_telegram;
-      if (req.body.updates) db.config.kalafUpdates = req.body.updates;
-
-      await writeDb(db);
-
-      res.json({
-        success: response.ok,
-        data: responseData,
-        db
-      });
-    } catch (err: any) {
-      console.error("Error invoking Kalaf sync proxy:", err);
-      res.status(500).json({ success: false, error: err.message });
-    }
   });
 
   // Version check API route

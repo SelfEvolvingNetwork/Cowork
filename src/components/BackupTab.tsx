@@ -8,12 +8,7 @@ import {
   Trash2,
   Server,
   ShieldCheck,
-  Settings,
-  Cpu,
-  User,
-  Globe,
-  Link,
-  Terminal
+  Settings
 } from 'lucide-react';
 import { Member, Shift, Term, SessionNotes, SessionAttendance, CalendarOverrides, CoworkingConfig } from '../types';
 
@@ -102,118 +97,6 @@ export function BackupTab({
     }
   };
 
-  // Kalaf platform integration states
-  const [kalafUserId, setKalafUserId] = useState<string | null>(null);
-  const [kalafHandshakeError, setKalafHandshakeError] = useState<string | null>(null);
-  const [kalafSyncing, setKalafSyncing] = useState<boolean>(false);
-  const [kalafSyncError, setKalafSyncError] = useState<string | null>(null);
-  const [kalafSyncResult, setKalafSyncResult] = useState<any>(null);
-
-  // Settings local states
-  const [regularDesks, setRegularDesks] = useState<number>(config.totalRegularDesks || 20);
-  const [premiumDesks, setPremiumDesks] = useState<number>(config.totalPremiumDesks || 5);
-  const [academyName, setAcademyName] = useState<string>(config.academyName || 'آموزشگاه پرستو');
-  const [academyPhone, setAcademyPhone] = useState<string>(config.academyPhone || '');
-  const [academyAddress, setAcademyAddress] = useState<string>(config.academyAddress || '');
-  const [academyLogo, setAcademyLogo] = useState<string>(config.academyLogo || '');
-
-  // Kalaf Specific local states
-  const [kalafVersion, setKalafVersion] = useState<string>(config.kalafVersion || "1.0.0-stable");
-  const [kalafIconEmoji, setKalafIconEmoji] = useState<string>(config.kalafIconEmoji || "⚙️");
-  const [kalafDescription, setKalafDescription] = useState<string>(config.kalafDescription || "سامانه مدیریت آموزشگاه پرستو متصل به کلاف");
-  const [kalafContactEmail, setKalafContactEmail] = useState<string>(config.kalafContactEmail || "Rulingcode@gmail.com");
-  const [kalafContactTelegram, setKalafContactTelegram] = useState<string>(config.kalafContactTelegram || "@parastu_support");
-  const [kalafUpdates, setKalafUpdates] = useState<string>(config.kalafUpdates || "راه‌اندازی نسخه اولیه کلاف");
-
-  // PostMessage handshake with parent window (Kalaf)
-  const triggerKalafHandshake = () => {
-    try {
-      console.log("Sending GET_CLIENT_IDENTITY postMessage handshake to Kalaf...");
-      window.parent.postMessage({
-        source: "kalaf-node-client",
-        action: "GET_CLIENT_IDENTITY",
-        nodeId: "kalaf-node-skd4vvm8"
-      }, "https://h14m-parastu.runflare.run");
-    } catch (e) {
-      console.error("Failed to send postMessage to parent window:", e);
-    }
-  };
-
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      // Ensure messages originate from safe Kalaf domain
-      if (event.origin !== "https://h14m-parastu.runflare.run") return;
-
-      if (event.data && event.data.source === "kalaf-os") {
-        const { action, success, userId, error } = event.data;
-        if (action === "CLIENT_IDENTITY_RESPONSE") {
-          if (success) {
-            console.log("شناسه کاربر کلاف دریافت شد:", userId);
-            setKalafUserId(userId);
-            setKalafHandshakeError(null);
-          } else {
-            console.error("خطای احراز هویت امنیتی:", error);
-            setKalafHandshakeError(error || "خطای نامشخص احراز هویت");
-          }
-        }
-      }
-    };
-
-    window.addEventListener("message", handleMessage);
-    
-    // Automatically trigger handshake on mount
-    triggerKalafHandshake();
-
-    // Trigger periodically in case window loads slowly
-    const interval = setInterval(triggerKalafHandshake, 3500);
-
-    return () => {
-      window.removeEventListener("message", handleMessage);
-      clearInterval(interval);
-    };
-  }, []);
-
-  // Sync Specifications with Kalaf Proxy Endpoint
-  const triggerKalafSync = async () => {
-    setKalafSyncing(true);
-    setKalafSyncError(null);
-    try {
-      const res = await fetch("/api/kalaf/sync", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          name: academyName.trim(),
-          version: kalafVersion.trim(),
-          iconEmoji: kalafIconEmoji.trim(),
-          description: kalafDescription.trim(),
-          contact_email: kalafContactEmail.trim(),
-          contact_telegram: kalafContactTelegram.trim(),
-          updates: kalafUpdates.trim()
-        })
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || `خطای سرور: ${res.status}`);
-      }
-
-      setKalafSyncResult(data.data);
-      showToast('success', 'مشخصات نود با موفقیت به پلتفرم آنلاین کلاف ارسال و همگام‌سازی شد.');
-      
-      if (data.db?.config) {
-        updateConfig(data.db.config);
-      }
-    } catch (err: any) {
-      console.error("Kalaf sync failed:", err);
-      setKalafSyncError(err.message || "خطا در ارتباط با سرور");
-      showToast('error', 'خطا در همگام‌سازی با کلاف: ' + (err.message || ""));
-    } finally {
-      setKalafSyncing(false);
-    }
-  };
-
   useEffect(() => {
     checkSecureFolderStatus();
   }, []);
@@ -225,6 +108,14 @@ export function BackupTab({
   const [showWipeConfirm, setShowWipeConfirm] = useState<boolean>(false);
   const [wipeConfirmText, setWipeConfirmText] = useState<string>('');
 
+  // Settings local states
+  const [regularDesks, setRegularDesks] = useState<number>(config.totalRegularDesks || 20);
+  const [premiumDesks, setPremiumDesks] = useState<number>(config.totalPremiumDesks || 5);
+  const [academyName, setAcademyName] = useState<string>(config.academyName || 'آموزشگاه پرستو');
+  const [academyPhone, setAcademyPhone] = useState<string>(config.academyPhone || '');
+  const [academyAddress, setAcademyAddress] = useState<string>(config.academyAddress || '');
+  const [academyLogo, setAcademyLogo] = useState<string>(config.academyLogo || '');
+
   // Synchronize local setting states when props change
   useEffect(() => {
     if (config) {
@@ -234,13 +125,6 @@ export function BackupTab({
       setAcademyPhone(config.academyPhone || '');
       setAcademyAddress(config.academyAddress || '');
       setAcademyLogo(config.academyLogo || '');
-
-      setKalafVersion(config.kalafVersion || "1.0.0-stable");
-      setKalafIconEmoji(config.kalafIconEmoji || "⚙️");
-      setKalafDescription(config.kalafDescription || "سامانه مدیریت آموزشگاه پرستو متصل به کلاف");
-      setKalafContactEmail(config.kalafContactEmail || "Rulingcode@gmail.com");
-      setKalafContactTelegram(config.kalafContactTelegram || "@parastu_support");
-      setKalafUpdates(config.kalafUpdates || "راه‌اندازی نسخه اولیه کلاف");
     }
   }, [config]);
 
@@ -398,14 +282,7 @@ export function BackupTab({
       academyName: academyName.trim(),
       academyPhone: academyPhone.trim(),
       academyAddress: academyAddress.trim(),
-      academyLogo: academyLogo,
-
-      kalafVersion: kalafVersion.trim(),
-      kalafIconEmoji: kalafIconEmoji.trim(),
-      kalafDescription: kalafDescription.trim(),
-      kalafContactEmail: kalafContactEmail.trim(),
-      kalafContactTelegram: kalafContactTelegram.trim(),
-      kalafUpdates: kalafUpdates.trim()
+      academyLogo: academyLogo
     });
     showToast('success', 'تنظیمات سیستم با موفقیت به‌روزرسانی و در سرور ذخیره شد.');
   };
@@ -827,168 +704,6 @@ export function BackupTab({
                     placeholder="مثال: تهران، خیابان آزادی، پلاک ۱۲"
                     className="w-full max-w-md px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-indigo-500 focus:bg-white transition-all resize-none"
                   />
-                </td>
-              </tr>
-
-              {/* Kalaf Platform Integration */}
-              <tr>
-                <td className="py-4 pl-3">
-                  <div className="flex items-center gap-1.5 font-extrabold text-slate-800">
-                    <Cpu className="w-4 h-4 text-indigo-600" />
-                    <span>اتصال به پلتفرم کلاف (نسخه نهایی)</span>
-                  </div>
-                  <div className="text-[10px] text-slate-400 font-medium mt-0.5">همگام‌سازی مشخصات نود و هندشیک دریافت شناسه کاربر در بستر IFrame</div>
-                </td>
-                <td className="py-4">
-                  <div className="flex flex-col gap-4 max-w-md bg-slate-50/50 border border-slate-200/60 rounded-xl p-4">
-                    
-                    {/* Identity Status Card */}
-                    <div className="flex flex-col gap-2 bg-white border border-slate-100 rounded-lg p-3">
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-slate-500 font-extrabold flex items-center gap-1">
-                          <User className="w-3.5 h-3.5 text-indigo-600" />
-                          <span>هویت کاربر کلاف:</span>
-                        </span>
-                        {kalafUserId ? (
-                          <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-black px-2 py-0.5 rounded-md">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                            {kalafUserId}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-black px-2 py-0.5 rounded-md">
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-                            در انتظار هندشیک
-                          </span>
-                        )}
-                      </div>
-
-                      {kalafHandshakeError && (
-                        <div className="text-[9px] text-rose-600 font-bold bg-rose-50 border border-rose-100 rounded p-1.5">
-                          خطای هندشیک: {kalafHandshakeError}
-                        </div>
-                      )}
-
-                      <div className="flex items-center justify-between text-[10px] text-slate-400 mt-1 border-t border-slate-50 pt-2">
-                        <span>شناسه اختصاصی نود: <b className="font-mono text-slate-600 select-all">kalaf-node-skd4vvm8</b></span>
-                        <button
-                          type="button"
-                          onClick={triggerKalafHandshake}
-                          className="text-[9px] font-black text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
-                          title="ارسال مجدد سیگنال postMessage برای دریافت شناسه کاربر کلاف"
-                        >
-                          تلاش مجدد هندشیک
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Sync Fields */}
-                    <div className="grid grid-cols-1 gap-3.5 border-t border-slate-100 pt-3">
-                      <div>
-                        <label className="text-[10.5px] font-extrabold text-slate-700 block mb-1">نسخه انتشار نود کلاف (version)</label>
-                        <input
-                          type="text"
-                          value={kalafVersion}
-                          onChange={(e) => setKalafVersion(e.target.value)}
-                          placeholder="مثال: 1.0.0-stable"
-                          className="w-full h-8 px-2.5 bg-white border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-indigo-500 transition-all font-mono text-left"
-                          dir="ltr"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-[10.5px] font-extrabold text-slate-700 block mb-1">ایموجی آیکون کلاف (iconEmoji)</label>
-                        <input
-                          type="text"
-                          value={kalafIconEmoji}
-                          onChange={(e) => setKalafIconEmoji(e.target.value)}
-                          placeholder="مثال: ⚙️ یا 🏫"
-                          className="w-full h-8 px-2.5 bg-white border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-indigo-500 transition-all text-center"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-[10.5px] font-extrabold text-slate-700 block mb-1">توضیحات نود در کلاف (description)</label>
-                        <textarea
-                          rows={2}
-                          value={kalafDescription}
-                          onChange={(e) => setKalafDescription(e.target.value)}
-                          placeholder="توضیحات مربوط به نود برای نمایش کاربران در پلتفرم کلاف..."
-                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-indigo-500 transition-all resize-none leading-relaxed"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="text-[10.5px] font-extrabold text-slate-700 block mb-1">ایمیل تماس</label>
-                          <input
-                            type="text"
-                            value={kalafContactEmail}
-                            onChange={(e) => setKalafContactEmail(e.target.value)}
-                            className="w-full h-8 px-2.5 bg-white border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-indigo-500 transition-all font-mono text-left"
-                            dir="ltr"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10.5px] font-extrabold text-slate-700 block mb-1">آی‌دی تلگرام</label>
-                          <input
-                            type="text"
-                            value={kalafContactTelegram}
-                            onChange={(e) => setKalafContactTelegram(e.target.value)}
-                            className="w-full h-8 px-2.5 bg-white border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-indigo-500 transition-all font-mono text-left"
-                            dir="ltr"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="text-[10.5px] font-extrabold text-slate-700 block mb-1">تغییرات آخرین نسخه (updates)</label>
-                        <textarea
-                          rows={2}
-                          value={kalafUpdates}
-                          onChange={(e) => setKalafUpdates(e.target.value)}
-                          placeholder="گزارش تغییرات برای ثبت در کلاف..."
-                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-indigo-500 transition-all resize-none leading-relaxed"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Action sync button */}
-                    <div className="border-t border-slate-100 pt-3 flex flex-col gap-2">
-                      <button
-                        type="button"
-                        onClick={triggerKalafSync}
-                        disabled={kalafSyncing}
-                        className="w-full h-9 flex items-center justify-center gap-1.5 text-xs font-black bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 text-white disabled:text-slate-400 rounded-lg cursor-pointer transition-all active:scale-[0.98] select-none shadow-sm"
-                      >
-                        <RefreshCw className={`w-3.5 h-3.5 ${kalafSyncing ? 'animate-spin' : ''}`} />
-                        <span>همگام‌سازی مشخصات با کلاف</span>
-                      </button>
-
-                      {/* Display last sync results */}
-                      <div className="text-[10px] text-slate-500 mt-1 flex flex-col gap-1 font-bold">
-                        <div className="flex items-center justify-between">
-                          <span>آخرین همگام‌سازی:</span>
-                          <span className="font-mono">{config.lastKalafSyncTime || 'تاکنون انجام نشده'}</span>
-                        </div>
-                        {config.lastKalafSyncStatus && (
-                          <div className="flex items-center justify-between">
-                            <span>وضعیت پاسخ کلاف:</span>
-                            {config.lastKalafSyncStatus === 'success' ? (
-                              <span className="text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 text-[9px] font-black">موفقیت‌آمیز</span>
-                            ) : (
-                              <span className="text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-100 text-[9px] font-black">خطا</span>
-                            )}
-                          </div>
-                        )}
-                        {config.lastKalafSyncMessage && (
-                          <div className="bg-slate-100/50 border border-slate-200/50 rounded p-1.5 text-[9px] leading-relaxed font-mono font-medium text-slate-600 mt-0.5 text-left break-all max-h-16 overflow-y-auto" dir="ltr">
-                            {config.lastKalafSyncMessage}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                  </div>
                 </td>
               </tr>
 
