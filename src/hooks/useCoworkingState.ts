@@ -519,18 +519,43 @@ export function useCoworkingState() {
 
   // CALENDAR DAYS TOGGLE
   const toggleDayStatus = async (dateStr: string) => {
-    // Optimistic Update
-    setCalendarOverrides(prev => {
-      const copy = { ...prev };
-      const currentStatus = copy[dateStr];
-      if (!currentStatus) {
-        copy[dateStr] = "holiday";
-      } else if (currentStatus === "holiday") {
-        copy[dateStr] = "working";
-      } else {
-        delete copy[dateStr];
-      }
-      return copy;
+    let nextStatus: 'holiday' | 'working' | undefined;
+    const currentStatus = calendarOverrides[dateStr];
+    if (!currentStatus) {
+      nextStatus = "holiday";
+    } else if (currentStatus === "holiday") {
+      nextStatus = "working";
+    } else {
+      nextStatus = undefined;
+    }
+
+    const updatedOverrides = { ...calendarOverrides };
+    if (nextStatus) {
+      updatedOverrides[dateStr] = nextStatus;
+    } else {
+      delete updatedOverrides[dateStr];
+    }
+
+    // Optimistic Update calendar overrides and recalculate terms
+    setCalendarOverrides(updatedOverrides);
+
+    setTerms(prevTerms => {
+      return prevTerms.map(t => {
+        const shift = shifts.find(s => s.id === t.shiftId);
+        if (!shift) return t;
+        const calc = calculateTermSessionsWithHistory(
+          t,
+          shift.weekDays,
+          updatedOverrides,
+          todayDate,
+          sessionAttendance
+        );
+        return {
+          ...t,
+          sessions: calc.sessions,
+          endDate: calc.endDate,
+        };
+      });
     });
 
     addToQueue({

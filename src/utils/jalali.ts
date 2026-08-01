@@ -291,7 +291,10 @@ export function calculateTermSessionsWithHistory(
       const status = sessionAttendance[attendanceKey];
       const hasAttendance = status === 'present' || status === 'absent';
       const isPast = date < todayDate;
-      if (isPast || hasAttendance) {
+      const dayIsHoliday = isHoliday(date, overrides);
+
+      // A holiday must NEVER be counted as a session for a subscriber, even if its date has passed
+      if (!dayIsHoliday && (isPast || hasAttendance)) {
         preservedSessions.push(date);
       }
     }
