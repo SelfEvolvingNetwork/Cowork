@@ -6,7 +6,6 @@ import {
   Clock, 
   HardDrive,
   RefreshCw,
-  Download,
   Cloud,
   CloudOff
 } from 'lucide-react';
@@ -17,8 +16,8 @@ interface RightSidebarProps {
   isSyncing: boolean;
   lastSyncedTime: string;
   manualSync: (silent?: boolean) => Promise<boolean>;
-  isInstallable: boolean;
-  onInstall: () => void;
+  isInstallable?: boolean;
+  onInstall?: () => void;
   uploadStatus: 'idle' | 'saving' | 'saved' | 'error';
   queueCount: number;
   academyName?: string;
@@ -31,8 +30,6 @@ export function RightSidebar({
   isSyncing, 
   lastSyncedTime, 
   manualSync,
-  isInstallable,
-  onInstall,
   uploadStatus,
   queueCount,
   academyName = 'آموزشگاه پرستو',
@@ -162,28 +159,6 @@ export function RightSidebar({
             <span className="text-slate-200 font-medium shrink-0">همگام‌سازی دستی داده‌ها</span>
             <span className="text-[9px] text-slate-400 font-normal shrink-0">
               آخرین همگام‌سازی: <span className="font-mono text-blue-400">{lastSyncedTime}</span>
-            </span>
-          </div>
-        </button>
-
-        {/* PWA Install Button */}
-        <button
-          id="pwa-install-btn"
-          onClick={onInstall}
-          className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-300 relative group cursor-pointer border shrink-0 ${
-            isInstallable 
-              ? 'bg-blue-600/15 text-blue-400 border-blue-500/45 hover:bg-blue-600/25' 
-              : 'text-slate-400 border-transparent hover:bg-slate-800/40 hover:text-blue-400 hover:border-slate-800/60'
-          }`}
-          title="نصب نسخه وب‌اپلیکیشن (PWA)"
-        >
-          <Download className="w-[18px] h-[18px] stroke-[1.8] shrink-0" />
-          
-          {/* Floating Tooltip Indicator - Minimal styling */}
-          <div className="invisible group-hover:visible absolute right-14 bg-slate-950 text-slate-100 text-[10px] font-bold py-1.5 px-2.5 rounded border border-slate-800 whitespace-nowrap z-50 shadow-xl font-sans text-right scale-95 origin-left group-hover:scale-100 transition-all pointer-events-none duration-150 flex flex-col gap-0.5 shrink-0" dir="rtl">
-            <span className="text-slate-200 font-medium shrink-0">نصب نسخه اپلیکیشن (PWA)</span>
-            <span className="text-[9px] text-slate-400 font-normal shrink-0">
-              {isInstallable ? 'آماده نصب روی دستگاه' : 'راهنمای نصب برنامه'}
             </span>
           </div>
         </button>
