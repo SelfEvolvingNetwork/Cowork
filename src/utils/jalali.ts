@@ -359,3 +359,22 @@ export function calculateTermSessionsWithHistory(
     endDate: finalSessions[finalSessions.length - 1] || term.startDate
   };
 }
+
+/**
+ * Calculates remaining days from today until endDate.
+ * Returns positive if endDate is in the future, 0 if today, or negative if endDate has passed.
+ */
+export function getRemainingDays(endDateStr: string, todayDateStr: string): number {
+  if (!endDateStr || !todayDateStr || endDateStr === '—' || todayDateStr === '—') return 0;
+  const end = parseJalaliString(endDateStr);
+  const today = parseJalaliString(todayDateStr);
+  
+  const endG = jalaliToGregorian(end.jy, end.jm, end.jd);
+  const todayG = jalaliToGregorian(today.jy, today.jm, today.jd);
+  
+  endG.setHours(0, 0, 0, 0);
+  todayG.setHours(0, 0, 0, 0);
+  
+  const diffMs = endG.getTime() - todayG.getTime();
+  return Math.round(diffMs / (1000 * 60 * 60 * 24));
+}

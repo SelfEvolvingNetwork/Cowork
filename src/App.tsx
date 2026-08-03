@@ -49,7 +49,7 @@ export default function App() {
   const [reportFilterOverride, setReportFilterOverride] = React.useState<{
     shiftId: string;
     deskType: 'all' | 'regular' | 'premium';
-    status: 'all' | 'current' | 'finished' | 'reserved';
+    status: 'all' | 'current' | 'finished' | 'reserved' | 'no_active_shift' | 'no_term';
   } | null>(null);
   const [toast, setToast] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [deferredPrompt, setDeferredPrompt] = React.useState<any>(null);

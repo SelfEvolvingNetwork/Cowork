@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Member, Shift, Term, SessionNotes, SessionAttendance } from '../types';
-import { ArrowUpDown, Filter, Search, CalendarClock, Check, X, Armchair, ShieldCheck, Gauge } from 'lucide-react';
+import { getRemainingDays } from '../utils/jalali';
+import { ArrowUpDown, Search, CalendarClock, Check, X, Armchair, ShieldCheck } from 'lucide-react';
 
 interface ReportsTabProps {
   terms: Term[];
@@ -15,12 +16,12 @@ interface ReportsTabProps {
   filterOverride?: {
     shiftId: string;
     deskType: 'all' | 'regular' | 'premium';
-    status: 'all' | 'current' | 'finished' | 'reserved';
+    status: 'all' | 'current' | 'finished' | 'reserved' | 'no_active_shift' | 'no_term';
   } | null;
   onClearFilterOverride?: () => void;
 }
 
-type SortField = 'fullName' | 'remainingSessionsCount' | 'deskType' | 'shiftName';
+type SortField = 'fullName' | 'remainingDaysCount' | 'remainingSessionsCount' | 'deskType' | 'shiftName';
 type SortOrder = 'asc' | 'desc';
 
 export function ReportsTab({
@@ -42,7 +43,7 @@ export function ReportsTab({
   const [deskTypeFilter, setDeskTypeFilter] = useState<'all' | 'regular' | 'premium'>('all');
   const [remainingSessionsFilter, setRemainingSessionsFilter] = useState<'all' | 'has_remaining' | 'no_remaining'>('all');
   const [attendanceTodayFilter, setAttendanceTodayFilter] = useState<'all' | 'present' | 'absent' | 'not_marked' | 'no_session_today'>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'current' | 'finished' | 'reserved'>('current');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'current' | 'no_active_shift' | 'finished' | 'reserved' | 'no_term'>('all');
 
   // React to external filter overrides
   React.useEffect(() => {
@@ -67,38 +68,78 @@ export function ReportsTab({
   }, [filterOverride, onClearFilterOverride]);
 
   // Sorting State
-  const [sortField, setSortField] = useState<SortField>('remainingSessionsCount');
+  const [sortField, setSortField] = useState<SortField>('remainingDaysCount');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
-  // Compute enriched reporting list
-  const enrichedReports = terms.map((term) => {
-    const member = members.find((m) => m.id === term.memberId);
-    const shift = shifts.find((s) => s.id === term.shiftId);
+  // Compute enriched reporting list - ONE row per user (displaying their LATEST term)
+  const enrichedReports = members.map((member) => {
+    const memberTerms = terms.filter((t) => t.memberId === member.id);
+
+    // Sort terms to get the latest term by startDate desc, then endDate desc, then id desc
+    const sortedTerms = [...memberTerms].sort((a, b) => {
+      if (a.startDate !== b.startDate) {
+        return b.startDate.localeCompare(a.startDate);
+      }
+      if (a.endDate !== b.endDate) {
+        return b.endDate.localeCompare(a.endDate);
+      }
+      return b.id.localeCompare(a.id);
+    });
+
+    const latestTerm = sortedTerms[0];
+
+    if (!latestTerm) {
+      return {
+        termId: `no_term_${member.id}`,
+        memberId: member.id,
+        fullName: member.fullName,
+        phone: member.phone,
+        deskType: 'regular' as const,
+        shiftName: 'بدون سانس',
+        shiftId: 'none',
+        startDate: '—',
+        endDate: '—',
+        sessionsCount: 0,
+        remainingSessionsCount: 0,
+        remainingDaysCount: 0,
+        sessions: [],
+        status: 'no_term' as const,
+        hasActiveShift: false,
+        hasTerm: false,
+      };
+    }
+
+    const shift = shifts.find((s) => s.id === latestTerm.shiftId);
 
     // Determine status relative to todayDate
     let statusLabel: 'current' | 'finished' | 'reserved' = 'current';
-    if (todayDate > term.endDate) {
+    if (todayDate > latestTerm.endDate) {
       statusLabel = 'finished';
-    } else if (todayDate < term.startDate) {
+    } else if (todayDate < latestTerm.startDate) {
       statusLabel = 'reserved';
     }
 
-    const remainingCount = term.sessions.filter((s) => s >= todayDate).length;
+    const remainingSessions = latestTerm.sessions.filter((s) => s >= todayDate).length;
+    const remainingDays = getRemainingDays(latestTerm.endDate, todayDate);
+    const hasActiveShift = statusLabel === 'current';
 
     return {
-      termId: term.id,
-      memberId: term.memberId,
-      fullName: member ? member.fullName : 'کاربر حذف شده',
-      phone: member ? member.phone : 'نامشخص',
-      deskType: term.deskType || 'regular',
+      termId: latestTerm.id,
+      memberId: member.id,
+      fullName: member.fullName,
+      phone: member.phone,
+      deskType: latestTerm.deskType || 'regular',
       shiftName: shift ? shift.name : 'سانس حذف شده',
-      shiftId: term.shiftId,
-      startDate: term.startDate,
-      endDate: term.endDate,
-      sessionsCount: term.sessionsCount,
-      remainingSessionsCount: remainingCount,
-      sessions: term.sessions,
+      shiftId: latestTerm.shiftId,
+      startDate: latestTerm.startDate,
+      endDate: latestTerm.endDate,
+      sessionsCount: latestTerm.sessionsCount,
+      remainingSessionsCount: remainingSessions,
+      remainingDaysCount: remainingDays,
+      sessions: latestTerm.sessions,
       status: statusLabel,
+      hasActiveShift,
+      hasTerm: true,
     };
   });
 
@@ -118,7 +159,12 @@ export function ReportsTab({
     const nameMatch = !nameFilter.trim() || rep.fullName.toLowerCase().includes(nameFilter.toLowerCase());
     
     // 2. Filter by shift (column 2)
-    const shiftMatch = selectedShiftId === 'all' || rep.shiftId === selectedShiftId;
+    let shiftMatch = true;
+    if (selectedShiftId === 'no_active') {
+      shiftMatch = !rep.hasActiveShift;
+    } else if (selectedShiftId !== 'all') {
+      shiftMatch = rep.shiftId === selectedShiftId;
+    }
 
     // 3. Filter by deskType (column 3)
     const deskTypeMatch = deskTypeFilter === 'all' || rep.deskType === deskTypeFilter;
@@ -126,9 +172,9 @@ export function ReportsTab({
     // 4. Filter by remaining sessions (column 4)
     let remainingMatch = true;
     if (remainingSessionsFilter === 'has_remaining') {
-      remainingMatch = rep.remainingSessionsCount > 0;
+      remainingMatch = rep.remainingSessionsCount > 0 || rep.remainingDaysCount > 0;
     } else if (remainingSessionsFilter === 'no_remaining') {
-      remainingMatch = rep.remainingSessionsCount === 0;
+      remainingMatch = rep.remainingSessionsCount <= 0 || rep.remainingDaysCount <= 0;
     }
 
     // 5. Filter by today's attendance (column 5)
@@ -148,7 +194,12 @@ export function ReportsTab({
     }
 
     // 6. Filter by Status (column 6)
-    const statusMatch = statusFilter === 'all' || rep.status === statusFilter;
+    let statusMatch = true;
+    if (statusFilter === 'no_active_shift') {
+      statusMatch = !rep.hasActiveShift;
+    } else if (statusFilter !== 'all') {
+      statusMatch = rep.status === statusFilter;
+    }
 
     return nameMatch && shiftMatch && deskTypeMatch && remainingMatch && attendanceMatch && statusMatch;
   });
@@ -162,6 +213,8 @@ export function ReportsTab({
       comparison = a.shiftName.localeCompare(b.shiftName, 'fa');
     } else if (sortField === 'deskType') {
       comparison = a.deskType.localeCompare(b.deskType);
+    } else if (sortField === 'remainingDaysCount') {
+      comparison = a.remainingDaysCount - b.remainingDaysCount;
     } else if (sortField === 'remainingSessionsCount') {
       comparison = a.remainingSessionsCount - b.remainingSessionsCount;
     }
@@ -180,7 +233,7 @@ export function ReportsTab({
           </h1>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {(nameFilter || selectedShiftId !== 'all' || deskTypeFilter !== 'all' || remainingSessionsFilter !== 'all' || attendanceTodayFilter !== 'all' || statusFilter !== 'current') && (
+          {(nameFilter || selectedShiftId !== 'all' || deskTypeFilter !== 'all' || remainingSessionsFilter !== 'all' || attendanceTodayFilter !== 'all' || statusFilter !== 'all') && (
             <button
               id="clear-report-filters-btn"
               onClick={() => {
@@ -189,9 +242,9 @@ export function ReportsTab({
                 setDeskTypeFilter('all');
                 setRemainingSessionsFilter('all');
                 setAttendanceTodayFilter('all');
-                setStatusFilter('current');
+                setStatusFilter('all');
               }}
-              className="text-xs text-rose-655 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3 py-2 rounded-xl font-bold flex items-center gap-1 cursor-pointer transition-colors"
+              className="text-xs text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3 py-2 rounded-xl font-bold flex items-center gap-1 cursor-pointer transition-colors"
             >
               <span>پاکسازی کامل فیلترها</span>
               <span>✕</span>
@@ -220,7 +273,7 @@ export function ReportsTab({
 
               {/* Column 2: Shift sort */}
               <th className="py-4 px-4 font-semibold text-slate-600 w-[18%]">
-                <button onClick={() => toggleSort('shiftName')} className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer text-right w-full" title="سانس کاری رزرو شده مشتری">
+                <button onClick={() => toggleSort('shiftName')} className="flex items-center gap-1.5 hover:text-slate-800 cursor-pointer text-right w-full" title="سانس کاری آخرین دوره مشتری">
                   <span>سانس</span>
                   <ArrowUpDown className="w-3.5 h-3.5 opacity-60 text-slate-400" />
                 </button>
@@ -234,19 +287,19 @@ export function ReportsTab({
                 </button>
               </th>
 
-              {/* Column 5: Remaining Sessions sort */}
-              <th className="py-4 px-4 font-semibold text-center text-slate-600 w-[11%]">
-                <button onClick={() => toggleSort('remainingSessionsCount')} className="flex items-center justify-center gap-1.5 hover:text-slate-800 cursor-pointer text-center w-full" title="تعداد جلسات باقی‌مانده و متباقی دوره">
-                  <span>باقی‌مانده</span>
+              {/* Column 5: Remaining Days sort */}
+              <th className="py-4 px-4 font-semibold text-center text-slate-600 w-[12%]">
+                <button onClick={() => toggleSort('remainingDaysCount')} className="flex items-center justify-center gap-1.5 hover:text-slate-800 cursor-pointer text-center w-full" title="روزهای باقی‌مانده تا پایان قرارداد (منفی یعنی گذشته)">
+                  <span>روزهای باقی‌مانده</span>
                   <ArrowUpDown className="w-3.5 h-3.5 opacity-60 text-slate-400" />
                 </button>
               </th>
 
               {/* Column 6: Today's Attendance */}
-              <th className="py-4 px-4 font-semibold text-center text-slate-600 w-[22%]" title={`وضعیت حضور و غیاب امروز مورخ ${todayDate}`}>حضور امروز</th>
+              <th className="py-4 px-4 font-semibold text-center text-slate-600 w-[21%]" title={`وضعیت حضور و غیاب امروز مورخ ${todayDate}`}>حضور امروز</th>
 
               {/* Column 7: Status */}
-              <th className="py-4 px-4 font-semibold text-center text-slate-600 w-[15%]" title="وضعیت زمانی اشتراک دوره">وضعیت</th>
+              <th className="py-4 px-4 font-semibold text-center text-slate-600 w-[15%]" title="وضعیت زمانی آخرین ترم مراجع">وضعیت</th>
 
             </tr>
 
@@ -279,7 +332,8 @@ export function ReportsTab({
                     className="w-full bg-white border border-slate-300 hover:border-slate-350 focus:border-blue-500 rounded-lg px-2 py-1.5 text-xs focus:outline-none cursor-pointer text-right transition-colors"
                     dir="rtl"
                   >
-                    <option value="all">همه</option>
+                    <option value="all">همه سانس‌ها</option>
+                    <option value="no_active">🚫 فاقد سانس فعال</option>
                     {shifts.map((s) => (
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
@@ -301,8 +355,8 @@ export function ReportsTab({
                   </select>
                 </td>
 
-                {/* 5. Remaining Sessions Filter */}
-                <td className="p-2 w-[11%] text-center">
+                {/* 5. Remaining Sessions / Days Filter */}
+                <td className="p-2 w-[12%] text-center">
                   <select
                     id="search-report-remaining"
                     value={remainingSessionsFilter}
@@ -310,13 +364,13 @@ export function ReportsTab({
                     className="w-full bg-white border border-slate-300 hover:border-slate-350 focus:border-blue-500 rounded-lg px-2 py-1.5 text-xs focus:outline-none cursor-pointer text-center transition-colors font-sans"
                   >
                     <option value="all">همه</option>
-                    <option value="has_remaining">دارد</option>
-                    <option value="no_remaining">ندارد</option>
+                    <option value="has_remaining">دارد (+)</option>
+                    <option value="no_remaining">منقضی / پایان‌یافته</option>
                   </select>
                 </td>
 
                 {/* 6. Today's Attendance Filter */}
-                <td className="p-2 w-[22%] text-center">
+                <td className="p-2 w-[21%] text-center">
                   <select
                     id="search-report-attendance-today"
                     value={attendanceTodayFilter}
@@ -340,10 +394,12 @@ export function ReportsTab({
                     className="w-full bg-white border border-slate-300 hover:border-slate-350 focus:border-blue-500 rounded-lg px-2 py-1.5 text-xs focus:outline-none cursor-pointer text-right transition-colors"
                     dir="rtl"
                   >
-                    <option value="all">همه</option>
+                    <option value="all">همه وضعیت‌ها</option>
                     <option value="current">فعال</option>
+                    <option value="no_active_shift">🚫 فاقد سانس فعال</option>
                     <option value="finished">پایان‌یافته</option>
                     <option value="reserved">رزرو</option>
+                    <option value="no_term">بدون ترم</option>
                   </select>
                 </td>
               </tr>
@@ -352,7 +408,7 @@ export function ReportsTab({
               {sortedReports.length === 0 ? (
                 <tr>
                    <td colSpan={7} className="py-12 text-center text-slate-400 italic">
-                     هیچ رکوردی منطبق با فیلترهای جستجویافته پیدا نشد.
+                     هیچ رکوردی منطبق با فیلترهای تعیین شده پیدا نشد.
                    </td>
                 </tr>
               ) : (
@@ -364,7 +420,7 @@ export function ReportsTab({
                   >
                     
                     {/* Row Index cell */}
-                    <td className="py-3.5 px-3 text-slate-405 text-center font-mono font-bold w-[6%]">
+                    <td className="py-3.5 px-3 text-slate-400 text-center font-mono font-bold w-[6%]">
                       {idx + 1}
                     </td>
 
@@ -372,7 +428,7 @@ export function ReportsTab({
                     <td className="py-3.5 px-4 font-bold text-slate-800 w-[17%]">
                       {onSelectMember ? (
                         <button
-                          onClick={() => onSelectMember(row.memberId, row.termId)}
+                          onClick={() => onSelectMember(row.memberId, row.hasTerm ? row.termId : undefined)}
                           className="hover:text-blue-600 hover:underline cursor-pointer transition-colors text-right font-bold focus:outline-none"
                         >
                           {row.fullName}
@@ -384,7 +440,11 @@ export function ReportsTab({
 
                     {/* Shift */}
                     <td className="py-3.5 px-4 w-[18%]">
-                      <span className="bg-slate-50 text-slate-700 text-xs px-2.5 py-1 rounded-md border border-slate-200 font-semibold text-right block truncate">
+                      <span className={`text-xs px-2.5 py-1 rounded-md border font-semibold text-right block truncate ${
+                        !row.hasTerm
+                          ? 'bg-amber-50/60 text-amber-700 border-amber-200'
+                          : 'bg-slate-50 text-slate-700 border-slate-200'
+                      }`}>
                         {row.shiftName}
                       </span>
                     </td>
@@ -402,22 +462,28 @@ export function ReportsTab({
                       )}
                     </td>
 
-                    {/* Remaining sessions */}
-                    <td className="py-3.5 px-4 text-center w-[11%] font-mono">
-                      <span className={`px-2.5 py-1 rounded-full font-bold text-xs inline-flex items-center gap-1 ${
-                        row.remainingSessionsCount === 0
-                           ? 'bg-rose-50 text-rose-705 border border-rose-100'
-                           : row.status === 'reserved'
-                           ? 'bg-blue-50 text-blue-700 border border-blue-100'
-                           : 'bg-emerald-50 text-emerald-800 border border-emerald-100'
-                      }`}>
-                        {row.remainingSessionsCount}
-                      </span>
+                    {/* Remaining Days */}
+                    <td className="py-3.5 px-4 text-center w-[12%] font-mono">
+                      {!row.hasTerm ? (
+                        <span className="text-slate-400 text-xs font-semibold select-none">—</span>
+                      ) : (
+                        <span className={`px-2.5 py-1 rounded-full font-bold text-xs inline-flex items-center gap-1 ${
+                          row.remainingDaysCount < 0
+                            ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                            : row.remainingDaysCount === 0
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                            : row.status === 'reserved'
+                            ? 'bg-blue-50 text-blue-700 border border-blue-100'
+                            : 'bg-emerald-50 text-emerald-800 border border-emerald-100'
+                        }`} title={`جلسات باقی‌مانده: ${row.remainingSessionsCount} از ${row.sessionsCount}`}>
+                          {row.remainingDaysCount > 0 ? `+${row.remainingDaysCount} روز` : `${row.remainingDaysCount} روز`}
+                        </span>
+                      )}
                     </td>
 
                     {/* Today's Attendance Column */}
-                    <td className="py-3.5 px-4 text-center w-[22%]">
-                      {row.sessions.includes(todayDate) ? (
+                    <td className="py-3.5 px-4 text-center w-[21%]">
+                      {row.hasTerm && row.sessions.includes(todayDate) ? (
                         (() => {
                            const noteKey = `${row.termId}_${todayDate}`;
                            const currentNote = sessionNotes[noteKey] || '';
@@ -438,8 +504,8 @@ export function ReportsTab({
                                   }}
                                   className={`px-3 py-1 text-xs font-bold rounded-lg flex items-center gap-1 cursor-pointer transition-all ${
                                     isPresent
-                                      ? 'bg-emerald-600 border border-emerald-605 text-white shadow-xs font-sans'
-                                      : 'bg-slate-50 border border-slate-205 text-slate-505 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-250 font-sans'
+                                      ? 'bg-emerald-600 border border-emerald-600 text-white shadow-xs font-sans'
+                                      : 'bg-slate-50 border border-slate-200 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-250 font-sans'
                                   }`}
                                   title="علامت‌گذاری به عنوان حاضر"
                                 >
@@ -457,7 +523,7 @@ export function ReportsTab({
                                   className={`px-3 py-1 text-xs font-bold rounded-lg flex items-center gap-1 cursor-pointer transition-all ${
                                     isAbsent
                                       ? 'bg-rose-600 border border-rose-600 text-white shadow-xs font-sans'
-                                      : 'bg-slate-50 border border-slate-205 text-slate-505 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-250 font-sans'
+                                      : 'bg-slate-50 border border-slate-200 text-slate-600 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-250 font-sans'
                                   }`}
                                   title="علامت‌گذاری به عنوان غایب"
                                 >
@@ -482,22 +548,27 @@ export function ReportsTab({
 
                     {/* Status badge */}
                     <td className="py-3.5 px-4 text-center w-[15%] animate-fade-in">
-                      <span className={`p-1.5 rounded-lg border inline-flex items-center justify-center ${
+                      <span className={`p-1.5 px-2.5 rounded-lg border inline-flex items-center justify-center gap-1 text-xs font-bold ${
                         row.status === 'finished'
                           ? 'bg-slate-100 border-slate-200 text-slate-500'
                           : row.status === 'reserved'
                           ? 'bg-blue-50 border-blue-150 text-blue-700'
+                          : row.status === 'no_term'
+                          ? 'bg-amber-50 border-amber-200 text-amber-700'
                           : 'bg-emerald-50 border-emerald-150 text-emerald-700'
                       }`} title={
                         row.status === 'finished' 
                           ? 'اشتراک پایان یافته' 
                           : row.status === 'reserved' 
                           ? 'اشتراک رزرو شده آینده' 
+                          : row.status === 'no_term'
+                          ? 'فاقد ترم و سانس'
                           : 'اشتراک جاری (فعال)'
                       }>
-                        {row.status === 'finished' && <X className="w-4 h-4" />}
-                        {row.status === 'reserved' && <CalendarClock className="w-4 h-4" />}
-                        {row.status === 'current' && <Check className="w-4 h-4" />}
+                        {row.status === 'finished' && <><X className="w-3.5 h-3.5" /><span>پایان‌یافته</span></>}
+                        {row.status === 'reserved' && <><CalendarClock className="w-3.5 h-3.5" /><span>رزرو</span></>}
+                        {row.status === 'current' && <><Check className="w-3.5 h-3.5" /><span>فعال</span></>}
+                        {row.status === 'no_term' && <span>بدون ترم</span>}
                       </span>
                     </td>
 
